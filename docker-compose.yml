@@ -1,0 +1,76 @@
+services:
+  db:
+    image: postgres:16
+    container_name: siglab-db
+    restart: always
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d:z
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U siglab -d siglab"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: maven:3.9-eclipse-temurin-25
+    container_name: siglab-backend
+    working_dir: /app
+
+    volumes:
+      - ./backend:/app:z
+      - ~/.m2:/root/.m2:z
+
+    command: mvn spring-boot:run
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      SPRING_DATASOURCE_URL: ${POSTGRES_URL}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER} 
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "true"
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: node:24-bookworm-slim
+    container_name: siglab-frontend
+    working_dir: /app
+
+    volumes:
+      - ./frontend:/app:z
+      - /app/node_modules
+
+    command: sh -c "npm install && npm run dev"
+
+    ports:
+      - "3000:3000"
+
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8080
+
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
