@@ -48,6 +48,7 @@ backend/build/
 backend/.springBeans
 
 # Environment / local configuration
+.env
 backend/.env
 backend/.env.*
 backend/application-local.properties
