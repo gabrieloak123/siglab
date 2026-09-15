@@ -2,6 +2,7 @@ package br.ufrn.dimap.siglab.service;
 
 import br.ufrn.dimap.siglab.dto.GroupMemberDTO;
 import br.ufrn.dimap.siglab.dto.InviteResponseDTO;
+import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
 import br.ufrn.dimap.siglab.model.*;
 import br.ufrn.dimap.siglab.repository.GroupInviteRepository;
 import br.ufrn.dimap.siglab.repository.ResearchGroupRepository;
@@ -12,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Serviço responsável por conter a lógica de negócio relacionada a Grupos de Pesquisa,
@@ -75,7 +75,7 @@ public class ResearchGroupService {
      * @param groupId o ID do grupo a ser atualizado
      * @param groupDetails os novos dados do grupo
      * @return o grupo de pesquisa atualizado
-     * @throws RuntimeException se o grupo não for encontrado
+     * @throws ResourceNotFoundException se o grupo não for encontrado
      */
     @Transactional
     public ResearchGroup update(String groupId, ResearchGroup groupDetails) {
@@ -88,19 +88,19 @@ public class ResearchGroupService {
                     }
                     return researchGroupRepository.save(group);
                 })
-                .orElseThrow(() -> new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId));
+                .orElseThrow(() -> new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId));
     }
 
     /**
      * Exclui um grupo de pesquisa pelo seu ID.
      *
      * @param groupId o ID do grupo a ser removido
-     * @throws RuntimeException se o grupo não for encontrado
+     * @throws ResourceNotFoundException se o grupo não for encontrado
      */
     @Transactional
     public void deleteById(String groupId) {
         if (!researchGroupRepository.existsById(groupId)) {
-            throw new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId);
+            throw new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId);
         }
         researchGroupRepository.deleteById(groupId);
     }
@@ -110,12 +110,12 @@ public class ResearchGroupService {
      *
      * @param groupId o ID do grupo de pesquisa
      * @return lista de DTOs {@link GroupMemberDTO} contendo dados dos usuários e se são líderes
-     * @throws RuntimeException se o grupo não for encontrado
+     * @throws ResourceNotFoundException se o grupo não for encontrado
      */
     @Transactional(readOnly = true)
     public List<GroupMemberDTO> findMembersByGroupId(String groupId) {
         if (!researchGroupRepository.existsById(groupId)) {
-            throw new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId);
+            throw new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId);
         }
 
         List<User_ResearchGroup> joinMembers = userResearchGroupRepository.findByGroupId(groupId);
@@ -143,14 +143,15 @@ public class ResearchGroupService {
      * @param userEmail o e-mail do usuário
      * @param isLeader {@code true} para definir como líder, {@code false} caso contrário
      * @return DTO {@link GroupMemberDTO} com o status atualizado do usuário
+     * @throws ResourceNotFoundException se o grupo ou usuário não forem encontrados
      */
     @Transactional
     public GroupMemberDTO setMemberLeadership(String groupId, String userEmail, boolean isLeader) {
         ResearchGroup researchGroup = researchGroupRepository.findById(groupId)
-                .orElseThrow(() -> new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId));
+                .orElseThrow(() -> new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId));
 
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado com o e-mail: " + userEmail));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o e-mail: " + userEmail));
 
         User_ResearchGroupId id = new User_ResearchGroupId(userEmail, groupId);
         User_ResearchGroup userResearchGroup = userResearchGroupRepository.findById(id)
@@ -182,12 +183,12 @@ public class ResearchGroupService {
      * @param userEmail o e-mail do usuário a ser removido
      * @param requesterEmail o e-mail do usuário solicitante da remoção
      * @throws SecurityException se o solicitante não for líder do grupo
-     * @throws RuntimeException se o grupo não for encontrado
+     * @throws ResourceNotFoundException se o grupo não for encontrado
      */
     @Transactional
     public void removeMemberFromGroup(String groupId, String userEmail, String requesterEmail) {
         if (!researchGroupRepository.existsById(groupId)) {
-            throw new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId);
+            throw new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId);
         }
 
         if (requesterEmail == null || requesterEmail.isBlank()) {
@@ -220,11 +221,12 @@ public class ResearchGroupService {
      * @param expirationDays dias até a expiração da hash (padrão 7)
      * @return DTO {@link InviteResponseDTO} com os dados da hash gerada
      * @throws SecurityException se o solicitante não for líder do grupo
+     * @throws ResourceNotFoundException se o grupo não for encontrado
      */
     @Transactional
     public InviteResponseDTO generateInviteToken(String groupId, String requesterEmail, Integer expirationDays) {
         ResearchGroup researchGroup = researchGroupRepository.findById(groupId)
-                .orElseThrow(() -> new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId));
+                .orElseThrow(() -> new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId));
 
         if (requesterEmail == null || requesterEmail.isBlank()) {
             throw new SecurityException("Acesso negado: a identificação do usuário solicitante é obrigatória.");
@@ -270,22 +272,23 @@ public class ResearchGroupService {
      * @param inviteToken a hash de convite
      * @param userEmail o e-mail do usuário que está ingressando
      * @return DTO {@link GroupMemberDTO} do usuário adicionado ao grupo
-     * @throws RuntimeException se o token for inválido, já utilizado ou expirado
+     * @throws IllegalArgumentException se o token for inválido, já utilizado ou expirado
+     * @throws ResourceNotFoundException se o usuário ou grupo não forem encontrados
      */
     @Transactional
     public GroupMemberDTO joinGroupWithToken(String inviteToken, String userEmail) {
         GroupInvite invite = groupInviteRepository.findByTokenAndUsedFalse(inviteToken)
-                .orElseThrow(() -> new RuntimeException("Token de convite inválido ou já utilizado: " + inviteToken));
+                .orElseThrow(() -> new IllegalArgumentException("Token de convite inválido ou já utilizado: " + inviteToken));
 
         if (invite.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("O token de convite expirou em " + invite.getExpiresAt());
+            throw new IllegalArgumentException("O token de convite expirou em " + invite.getExpiresAt());
         }
 
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado com o e-mail: " + userEmail));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o e-mail: " + userEmail));
 
         ResearchGroup researchGroup = researchGroupRepository.findById(invite.getGroupId())
-                .orElseThrow(() -> new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + invite.getGroupId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + invite.getGroupId()));
 
         User_ResearchGroupId id = new User_ResearchGroupId(userEmail, invite.getGroupId());
         User_ResearchGroup userResearchGroup = userResearchGroupRepository.findById(id)

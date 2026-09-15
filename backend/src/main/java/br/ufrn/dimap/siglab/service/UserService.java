@@ -1,5 +1,6 @@
 package br.ufrn.dimap.siglab.service;
 
+import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -84,7 +85,7 @@ public class UserService {
      * @param id o ID do usuário a atualizar
      * @param userDetails os novos dados do usuário
      * @return o usuário atualizado
-     * @throws RuntimeException se o usuário não for encontrado
+     * @throws ResourceNotFoundException se o usuário não for encontrado
      */
     @Transactional
     public User update(Long id, User userDetails) {
@@ -102,19 +103,19 @@ public class UserService {
                     user.setInterest_areas(userDetails.getInterest_areas());
                     return userRepository.save(user);
                 })
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado com o ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o ID: " + id));
     }
 
     /**
      * Exclui um usuário pelo seu ID.
      *
      * @param id o ID do usuário a ser deletado
-     * @throws RuntimeException se o usuário não for encontrado
+     * @throws ResourceNotFoundException se o usuário não for encontrado
      */
     @Transactional
     public void deleteById(Long id) {
         if (!userRepository.existsById(id)) {
-            throw new RuntimeException("Usuário não encontrado com o ID: " + id);
+            throw new ResourceNotFoundException("Usuário não encontrado com o ID: " + id);
         }
         userRepository.deleteById(id);
     }

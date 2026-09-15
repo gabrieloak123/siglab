@@ -1,5 +1,6 @@
 package br.ufrn.dimap.siglab.controller;
 
+import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.service.UserService;
 import jakarta.validation.Valid;
@@ -34,7 +35,7 @@ public class UserController {
     public ResponseEntity<User> getUserById(@PathVariable Long id) {
         return userService.findById(id)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o ID: " + id));
     }
 
     @PostMapping
@@ -45,21 +46,13 @@ public class UserController {
 
     @PutMapping("/{id}")
     public ResponseEntity<User> updateUser(@PathVariable Long id, @Valid @RequestBody User userDetails) {
-        try {
-            User updatedUser = userService.update(id, userDetails);
-            return ResponseEntity.ok(updatedUser);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        User updatedUser = userService.update(id, userDetails);
+        return ResponseEntity.ok(updatedUser);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        try {
-            userService.deleteById(id);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        userService.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }
