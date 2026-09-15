@@ -115,16 +115,26 @@ public class UserService {
     }
 
     /**
-     * Exclui um usuário pelo seu ID.
+     * Exclui um usuário pelo seu ID mediante confirmação de senha.
      *
      * @param id o ID do usuário a ser deletado
+     * @param password a senha de confirmação do usuário
      * @throws ResourceNotFoundException se o usuário não for encontrado
+     * @throws SecurityException se a senha fornecida for incorreta ou ausente
      */
     @Transactional
-    public void deleteById(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Usuário não encontrado com o ID: " + id);
+    public void deleteById(Long id, String password) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o ID: " + id));
+
+        if (password == null || password.isBlank()) {
+            throw new SecurityException("A confirmação da senha é obrigatória para excluir a conta de usuário.");
         }
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new SecurityException("Senha incorreta. Não foi possível excluir a conta.");
+        }
+
         userRepository.deleteById(id);
     }
 

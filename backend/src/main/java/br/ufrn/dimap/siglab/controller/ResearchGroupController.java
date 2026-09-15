@@ -144,9 +144,21 @@ public class ResearchGroupController {
         return ResponseEntity.ok(updatedGroup);
     }
 
+    /**
+     * DELETE /api/research-groups/{id} - Remove um grupo de pesquisa (Apenas Líder, exige confirmação com senha do orientador/líder).
+     *
+     * @param groupId o ID do grupo de pesquisa
+     * @param requesterEmailHeader o e-mail do líder solicitante no Header {@code X-Requester-Email} (opcional se autenticado)
+     * @param leaderPassword a senha do líder para confirmação de exclusão
+     * @return {@link ResponseEntity} sem conteúdo (204 No Content)
+     */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteResearchGroup(@PathVariable("id") String groupId) {
-        researchGroupService.deleteById(groupId);
+    public ResponseEntity<Void> deleteResearchGroup(
+            @PathVariable("id") String groupId,
+            @RequestHeader(value = "X-Requester-Email", required = false) String requesterEmailHeader,
+            @RequestParam(value = "leaderPassword", required = false) String leaderPassword) {
+        String requesterEmail = resolveRequesterEmail(requesterEmailHeader);
+        researchGroupService.deleteById(groupId, requesterEmail, leaderPassword);
         return ResponseEntity.noContent().build();
     }
 }

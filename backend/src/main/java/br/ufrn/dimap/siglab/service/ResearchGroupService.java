@@ -8,6 +8,7 @@ import br.ufrn.dimap.siglab.repository.GroupInviteRepository;
 import br.ufrn.dimap.siglab.repository.ResearchGroupRepository;
 import br.ufrn.dimap.siglab.repository.UserRepository;
 import br.ufrn.dimap.siglab.repository.User_ResearchGroupRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,15 +27,18 @@ public class ResearchGroupService {
     private final User_ResearchGroupRepository userResearchGroupRepository;
     private final UserRepository userRepository;
     private final GroupInviteRepository groupInviteRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public ResearchGroupService(ResearchGroupRepository researchGroupRepository,
                                 User_ResearchGroupRepository userResearchGroupRepository,
                                 UserRepository userRepository,
-                                GroupInviteRepository groupInviteRepository) {
+                                GroupInviteRepository groupInviteRepository,
+                                PasswordEncoder passwordEncoder) {
         this.researchGroupRepository = researchGroupRepository;
         this.userResearchGroupRepository = userResearchGroupRepository;
         this.userRepository = userRepository;
         this.groupInviteRepository = groupInviteRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     /**
@@ -100,17 +104,46 @@ public class ResearchGroupService {
     }
 
     /**
-     * Exclui um grupo de pesquisa pelo seu ID.
+     * Exclui um grupo de pesquisa mediante confirmação de senha do orientador/líder.
      *
      * @param groupId o ID do grupo a ser removido
-     * @throws ResourceNotFoundException se o grupo não for encontrado
+     * @param leaderEmail o e-mail do orientador solicitante
+     * @param leaderPassword a senha de confirmação do orientador
+     * @throws ResourceNotFoundException se o grupo ou usuário não forem encontrados
+     * @throws SecurityException se o usuário não for líder do grupo ou a senha estiver incorreta
      */
     @Transactional
-    public void deleteById(String groupId) {
+    public void deleteById(String groupId, String leaderEmail, String leaderPassword) {
         if (!researchGroupRepository.existsById(groupId)) {
             throw new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId);
         }
+
+        if (leaderEmail == null || leaderEmail.isBlank()) {
+            throw new SecurityException("Acesso negado: a identificação do líder/orientador é obrigatória para excluir o grupo.");
+        }
+
+        User_ResearchGroupId requesterId = new User_ResearchGroupId(leaderEmail, groupId);
+        boolean isLeader = userResearchGroupRepository.findById(requesterId)
+                .map(User_ResearchGroup::isLeader)
+                .orElse(false);
+
+        if (!isLeader) {
+            throw new SecurityException("Acesso negado: apenas orientadores/líderes do grupo podem excluí-lo.");
+        }
+
+        if (leaderPassword == null || leaderPassword.isBlank()) {
+            throw new SecurityException("A confirmação da senha do orientador é obrigatória para excluir o grupo de pesquisa.");
+        }
+
+        User leader = userRepository.findByEmail(leaderEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário orientador não encontrado com o e-mail: " + leaderEmail));
+
+        if (!passwordEncoder.matches(leaderPassword, leader.getPassword())) {
+            throw new SecurityException("Senha incorreta do orientador. Não foi possível excluir o grupo de pesquisa.");
+        }
+
         groupInviteRepository.deleteByGroupId(groupId);
+        userResearchGroupRepository.deleteAll(userResearchGroupRepository.findByGroupId(groupId));
         researchGroupRepository.deleteById(groupId);
     }
 
