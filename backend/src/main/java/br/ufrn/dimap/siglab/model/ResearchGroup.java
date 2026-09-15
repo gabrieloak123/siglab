@@ -1,5 +1,6 @@
 package br.ufrn.dimap.siglab.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
@@ -29,11 +30,14 @@ public class ResearchGroup {
     @OneToMany(mappedBy = "researchGroup", cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
+    @JsonIgnore
     private List<User_ResearchGroup> groupMembers;
 
     @Transient
+    @JsonIgnore
     private User[] members;
 
+    @JsonIgnore
     public String getGroupId() {
         return group_id;
     }
@@ -42,6 +46,7 @@ public class ResearchGroup {
         this.group_id = groupId;
     }
 
+    @JsonIgnore
     public String[] getResearchFields() {
         return research_fields;
     }
@@ -50,6 +55,7 @@ public class ResearchGroup {
         this.research_fields = researchFields;
     }
 
+    @JsonIgnore
     public User[] getMembers() {
         if (members != null) {
             return members;

@@ -1,11 +1,15 @@
 package br.ufrn.dimap.siglab.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "users")
@@ -17,6 +21,8 @@ public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @Schema(accessMode = Schema.AccessMode.READ_ONLY, description = "ID auto-incremental gerado pelo banco de dados")
     private Long id;
 
     @NotBlank
@@ -36,13 +42,15 @@ public class User {
     private String[] interest_areas;
 
     @Column(name = "groups")
-    private Long[] groups;
+    private String[] groups;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
+    @JsonIgnore
     private List<User_ResearchGroup> userResearchGroups;
 
+    @JsonIgnore
     public String[] getInterestAreas() {
         return interest_areas;
     }
@@ -51,11 +59,14 @@ public class User {
         this.interest_areas = interestAreas;
     }
 
-    public Long[] getGroups() {
-        return groups;
-    }
-
-    public void setGroups(Long[] groups) {
-        this.groups = groups;
+    @JsonIgnore
+    public List<ResearchGroup> getResearchGroupsList() {
+        if (userResearchGroups == null) {
+            return List.of();
+        }
+        return userResearchGroups.stream()
+                .map(User_ResearchGroup::getResearchGroup)
+                .filter(Objects::nonNull)
+                .toList();
     }
 }

@@ -15,15 +15,13 @@ public class User_ResearchGroup {
     private User_ResearchGroupId id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("userEmail")
-    @JoinColumn(name = "user_email", referencedColumnName = "email")
+    @JoinColumn(name = "user_email", referencedColumnName = "email", insertable = false, updatable = false)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("groupId")
-    @JoinColumn(name = "group_id", referencedColumnName = "group_id")
+    @JoinColumn(name = "group_id", referencedColumnName = "group_id", insertable = false, updatable = false)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private ResearchGroup researchGroup;
