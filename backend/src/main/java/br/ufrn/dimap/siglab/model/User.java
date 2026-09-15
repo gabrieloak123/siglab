@@ -45,10 +45,11 @@ public class User {
     private String email;
 
     /**
-     * Senha de acesso do usuário.
+     * Senha de acesso do usuário (apenas escrita em JSON, nunca retornada em respostas GET).
      */
     @NotBlank
     @Column(name = "password", nullable = false)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     /**
