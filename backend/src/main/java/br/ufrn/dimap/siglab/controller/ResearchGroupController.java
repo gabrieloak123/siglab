@@ -8,6 +8,8 @@ import br.ufrn.dimap.siglab.service.ResearchGroupService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -51,19 +53,37 @@ public class ResearchGroupController {
     }
 
     /**
+     * Extrai o e-mail do solicitante priorizando o contexto de segurança (SecurityContextHolder).
+     * Se o usuário estiver autenticado no Spring Security, seu identificador é utilizado;
+     * caso contrário, utiliza o valor do header 'X-Requester-Email' como fallback.
+     *
+     * @param headerEmail o e-mail informado no header da requisição (opcional)
+     * @return o e-mail do solicitante identificado
+     */
+    private String resolveRequesterEmail(String headerEmail) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()
+                && !"anonymousUser".equals(authentication.getPrincipal())) {
+            return authentication.getName();
+        }
+        return headerEmail;
+    }
+
+    /**
      * POST /api/research-groups/{groupId}/invites - Gera um token/hash de convite para um grupo de pesquisa (Apenas Líder).
      *
      * @param groupId o ID do grupo de pesquisa
-     * @param requesterEmail o e-mail do líder solicitante enviado no Header {@code X-Requester-Email}
+     * @param requesterEmailHeader o e-mail do líder solicitante no Header {@code X-Requester-Email} (opcional se autenticado)
      * @param expirationDays quantidade de dias até a expiração da hash (padrão 7)
      * @return {@link ResponseEntity} com os dados do convite gerado (201 Created) ou 403 Forbidden
      */
     @PostMapping("/{groupId}/invites")
     public ResponseEntity<?> createInviteToken(
             @PathVariable("groupId") String groupId,
-            @RequestHeader(value = "X-Requester-Email", required = false) String requesterEmail,
+            @RequestHeader(value = "X-Requester-Email", required = false) String requesterEmailHeader,
             @RequestParam(value = "expirationDays", defaultValue = "7") Integer expirationDays) {
         try {
+            String requesterEmail = resolveRequesterEmail(requesterEmailHeader);
             InviteResponseDTO invite = researchGroupService.generateInviteToken(groupId, requesterEmail, expirationDays);
             return ResponseEntity.status(HttpStatus.CREATED).body(invite);
         } catch (SecurityException e) {
@@ -115,15 +135,16 @@ public class ResearchGroupController {
      *
      * @param groupId o ID do grupo de pesquisa
      * @param userEmail o e-mail do usuário a ser removido
-     * @param requesterEmail o e-mail do solicitante enviado no Header {@code X-Requester-Email}
+     * @param requesterEmailHeader o e-mail do solicitante no Header {@code X-Requester-Email} (opcional se autenticado)
      * @return {@link ResponseEntity} sem conteúdo (204 No Content), 403 Forbidden ou 404 Not Found
      */
     @DeleteMapping("/{groupId}/members/{userEmail:.+}")
     public ResponseEntity<?> removeMemberFromGroup(
             @PathVariable("groupId") String groupId,
             @PathVariable("userEmail") String userEmail,
-            @RequestHeader(value = "X-Requester-Email", required = false) String requesterEmail) {
+            @RequestHeader(value = "X-Requester-Email", required = false) String requesterEmailHeader) {
         try {
+            String requesterEmail = resolveRequesterEmail(requesterEmailHeader);
             researchGroupService.removeMemberFromGroup(groupId, userEmail, requesterEmail);
             return ResponseEntity.noContent().build();
         } catch (SecurityException e) {

@@ -218,15 +218,17 @@ public class ResearchGroupService {
             throw new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId);
         }
 
-        if (requesterEmail != null && !requesterEmail.isBlank()) {
-            User_ResearchGroupId requesterId = new User_ResearchGroupId(requesterEmail, groupId);
-            boolean isLeader = userResearchGroupRepository.findById(requesterId)
-                    .map(User_ResearchGroup::isLeader)
-                    .orElse(false);
+        if (requesterEmail == null || requesterEmail.isBlank()) {
+            throw new SecurityException("Acesso negado: a identificação do usuário solicitante é obrigatória.");
+        }
 
-            if (!isLeader) {
-                throw new SecurityException("Acesso negado: apenas líderes do grupo podem remover membros.");
-            }
+        User_ResearchGroupId requesterId = new User_ResearchGroupId(requesterEmail, groupId);
+        boolean isLeader = userResearchGroupRepository.findById(requesterId)
+                .map(User_ResearchGroup::isLeader)
+                .orElse(false);
+
+        if (!isLeader) {
+            throw new SecurityException("Acesso negado: apenas líderes do grupo podem remover membros.");
         }
 
         User_ResearchGroupId targetId = new User_ResearchGroupId(userEmail, groupId);
@@ -262,15 +264,17 @@ public class ResearchGroupService {
         ResearchGroup researchGroup = researchGroupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId));
 
-        if (requesterEmail != null && !requesterEmail.isBlank()) {
-            User_ResearchGroupId requesterId = new User_ResearchGroupId(requesterEmail, groupId);
-            boolean isLeader = userResearchGroupRepository.findById(requesterId)
-                    .map(User_ResearchGroup::isLeader)
-                    .orElse(false);
+        if (requesterEmail == null || requesterEmail.isBlank()) {
+            throw new SecurityException("Acesso negado: a identificação do usuário solicitante é obrigatória.");
+        }
 
-            if (!isLeader) {
-                throw new SecurityException("Acesso negado: apenas líderes do grupo podem gerar tokens de convite.");
-            }
+        User_ResearchGroupId requesterId = new User_ResearchGroupId(requesterEmail, groupId);
+        boolean isLeader = userResearchGroupRepository.findById(requesterId)
+                .map(User_ResearchGroup::isLeader)
+                .orElse(false);
+
+        if (!isLeader) {
+            throw new SecurityException("Acesso negado: apenas líderes do grupo podem gerar tokens de convite.");
         }
 
         int days = (expirationDays != null && expirationDays > 0) ? expirationDays : 7;
