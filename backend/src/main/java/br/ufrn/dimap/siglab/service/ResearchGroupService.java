@@ -42,6 +42,7 @@ public class ResearchGroupService {
      *
      * @return lista de {@link ResearchGroup}
      */
+    @Transactional(readOnly = true)
     public List<ResearchGroup> findAll() {
         return researchGroupRepository.findAll();
     }
@@ -52,6 +53,7 @@ public class ResearchGroupService {
      * @param groupId o ID do grupo
      * @return {@link Optional} contendo o grupo se encontrado
      */
+    @Transactional(readOnly = true)
     public Optional<ResearchGroup> findById(String groupId) {
         return researchGroupRepository.findById(groupId);
     }
@@ -62,6 +64,7 @@ public class ResearchGroupService {
      * @param researchGroup a entidade do grupo de pesquisa
      * @return o grupo salvo
      */
+    @Transactional
     public ResearchGroup save(ResearchGroup researchGroup) {
         return researchGroupRepository.save(researchGroup);
     }
@@ -74,6 +77,7 @@ public class ResearchGroupService {
      * @return o grupo de pesquisa atualizado
      * @throws RuntimeException se o grupo não for encontrado
      */
+    @Transactional
     public ResearchGroup update(String groupId, ResearchGroup groupDetails) {
         return researchGroupRepository.findById(groupId)
                 .map(group -> {
@@ -93,6 +97,7 @@ public class ResearchGroupService {
      * @param groupId o ID do grupo a ser removido
      * @throws RuntimeException se o grupo não for encontrado
      */
+    @Transactional
     public void deleteById(String groupId) {
         if (!researchGroupRepository.existsById(groupId)) {
             throw new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId);
@@ -102,15 +107,12 @@ public class ResearchGroupService {
 
     /**
      * Busca todos os usuários membros de um grupo de pesquisa.
-     * <p>
-     * Combina os membros cadastrados na tabela de junção {@code user_research_group}
-     * com os usuários que possuem o ID do grupo em seu array {@code groups}.
-     * </p>
      *
      * @param groupId o ID do grupo de pesquisa
      * @return lista de DTOs {@link GroupMemberDTO} contendo dados dos usuários e se são líderes
      * @throws RuntimeException se o grupo não for encontrado
      */
+    @Transactional(readOnly = true)
     public List<GroupMemberDTO> findMembersByGroupId(String groupId) {
         if (!researchGroupRepository.existsById(groupId)) {
             throw new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId);
