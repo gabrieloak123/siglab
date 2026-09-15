@@ -63,9 +63,17 @@ public class ResearchGroupService {
      *
      * @param researchGroup a entidade do grupo de pesquisa
      * @return o grupo salvo
+     * @throws IllegalArgumentException se já existir um grupo com o mesmo ID
      */
     @Transactional
     public ResearchGroup save(ResearchGroup researchGroup) {
+        if (researchGroup.getGroup_id() != null && !researchGroup.getGroup_id().isBlank()) {
+            String trimmedId = researchGroup.getGroup_id().trim();
+            researchGroup.setGroup_id(trimmedId);
+            if (researchGroupRepository.existsById(trimmedId)) {
+                throw new IllegalArgumentException("Já existe um grupo de pesquisa cadastrado com o ID: " + trimmedId);
+            }
+        }
         return researchGroupRepository.save(researchGroup);
     }
 
@@ -292,13 +300,12 @@ public class ResearchGroupService {
                 .orElseThrow(() -> new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + invite.getGroupId()));
 
         User_ResearchGroupId id = new User_ResearchGroupId(userEmail, invite.getGroupId());
-        User_ResearchGroup userResearchGroup = userResearchGroupRepository.findById(id)
-                .orElseGet(() -> {
-                    User_ResearchGroup newUrg = new User_ResearchGroup();
-                    newUrg.setId(id);
-                    return newUrg;
-                });
+        if (userResearchGroupRepository.existsById(id)) {
+            throw new IllegalArgumentException("Você já é integrante deste grupo de pesquisa.");
+        }
 
+        User_ResearchGroup userResearchGroup = new User_ResearchGroup();
+        userResearchGroup.setId(id);
         userResearchGroup.setUser(user);
         userResearchGroup.setResearchGroup(researchGroup);
         userResearchGroup.setLeader(false);

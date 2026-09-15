@@ -51,6 +51,11 @@ export default function Home() {
 
   const [joinHashInput, setJoinHashInput] = useState("");
 
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [newGroupId, setNewGroupId] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupFields, setNewGroupFields] = useState("");
+
   useEffect(() => {
     const savedUser = localStorage.getItem("siglab_user");
     if (savedUser) {
@@ -267,6 +272,72 @@ export default function Home() {
     }
   };
 
+  const handleCreateGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!currentUser) {
+      setErrorMessage("Você precisa estar logado para criar um grupo de pesquisa.");
+      return;
+    }
+
+    if (!newGroupId.trim() || !newGroupName.trim()) {
+      setErrorMessage("Por favor, informe o Código ID e o Nome do Grupo de Pesquisa.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const fieldsArray = newGroupFields
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+
+      const groupRes = await fetch(`${getApiUrl()}/api/research-groups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_id: newGroupId.trim(),
+          name: newGroupName.trim(),
+          research_fields: fieldsArray,
+        }),
+      });
+
+      if (!groupRes.ok && groupRes.status !== 201) {
+        const errData = await groupRes.json().catch(() => null);
+        setErrorMessage(
+          errData?.message || "Erro ao criar grupo de pesquisa. Verifique se o Código ID já existe."
+        );
+        setLoading(false);
+        return;
+      }
+
+      const leaderRes = await fetch(
+        `${getApiUrl()}/api/research-groups/${encodeURIComponent(newGroupId.trim())}/members/${encodeURIComponent(currentUser.email)}/leader?isLeader=true`,
+        {
+          method: "PUT",
+        }
+      );
+
+      if (leaderRes.ok) {
+        setSuccessMessage(`Grupo de pesquisa '${newGroupName.trim()}' criado com sucesso! Você foi definido como líder/orientador.`);
+        setNewGroupId("");
+        setNewGroupName("");
+        setNewGroupFields("");
+        setIsCreateGroupOpen(false);
+        fetchUserGroups(currentUser.email);
+        fetchPublicGroups();
+      } else {
+        setErrorMessage("Grupo criado, mas ocorreu uma falha ao registrar o líder.");
+      }
+    } catch (err) {
+      setErrorMessage("Falha na comunicação ao tentar criar o grupo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGenerateInvite = async (groupId: string) => {
     if (!currentUser) return;
     setErrorMessage("");
@@ -345,32 +416,106 @@ export default function Home() {
           </div>
         )}
 
-        {currentUser ? (
+
           <div className="space-y-8">
-            <section className="bg-white p-6 rounded border border-gray-300">
-              <h2 className="text-lg font-bold text-[#333333] mb-2">
-                Entrar em um Grupo de Pesquisa
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Cole abaixo a hash/token de convite gerada pelo orientador/líder do grupo.
-              </p>
-              <form onSubmit={handleJoinGroupWithHash} className="flex gap-3 max-w-xl">
-                <input
-                  type="text"
-                  placeholder="Ex: INV-IA-001-A1B2C3D4"
-                  value={joinHashInput}
-                  onChange={(e) => setJoinHashInput(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-[#333333] focus:outline-none focus:border-[#3E885B]"
-                />
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-green text-sm whitespace-nowrap"
-                >
-                  {loading ? "Entrando..." : "Entrar no Grupo"}
-                </button>
-              </form>
-            </section>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <section className="bg-white p-6 rounded border border-gray-300">
+                <div className="flex justify-between items-center mb-3">
+                  <h2 className="text-lg font-bold text-[#333333]">
+                    Criar Grupo de Pesquisa
+                  </h2>
+                  <button
+                    onClick={() => setIsCreateGroupOpen(!isCreateGroupOpen)}
+                    className="btn-green text-xs"
+                  >
+                    {isCreateGroupOpen ? "Cancelar" : "+ Criar Grupo"}
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 mb-4">
+                  Ao criar um grupo, você se torna o <strong>Líder/Orientador</strong> automaticamente.
+                </p>
+
+                {isCreateGroupOpen && (
+                  <form onSubmit={handleCreateGroup} className="space-y-3 pt-2 border-t border-gray-200">
+                    <div>
+                      <label className="block text-xs font-bold text-[#333333] mb-1">
+                        Código ID do Grupo (Chave Única)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: IA-002, ROB-001"
+                        value={newGroupId}
+                        onChange={(e) => setNewGroupId(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-[#333333] focus:outline-none focus:border-[#3E885B]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#333333] mb-1">
+                        Nome do Grupo de Pesquisa
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Grupo de Robótica e Automação"
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-[#333333] focus:outline-none focus:border-[#3E885B]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#333333] mb-1">
+                        Linhas de Pesquisa (Separadas por vírgula)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Robótica Móvel, Sistemas Autônomos"
+                        value={newGroupFields}
+                        onChange={(e) => setNewGroupFields(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-[#333333] focus:outline-none focus:border-[#3E885B]"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="btn-green text-sm w-full"
+                    >
+                      {loading ? "Criando Grupo..." : "Confirmar e Criar Grupo"}
+                    </button>
+                  </form>
+                )}
+              </section>
+
+              <section className="bg-white p-6 rounded border border-gray-300 flex flex-col justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-[#333333] mb-2">
+                    Entrar em um Grupo (Via Hash)
+                  </h2>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Digite a hash/token enviada pelo orientador para ingressar no grupo.
+                  </p>
+                </div>
+                <form onSubmit={handleJoinGroupWithHash} className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Ex: INV-IA-001-A1B2C3D4"
+                    value={joinHashInput}
+                    onChange={(e) => setJoinHashInput(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-[#333333] focus:outline-none focus:border-[#3E885B]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn-green text-sm whitespace-nowrap"
+                  >
+                    {loading ? "Entrando..." : "Entrar"}
+                  </button>
+                </form>
+              </section>
+            </div>
 
             <section className="bg-white p-6 rounded border border-gray-300">
               <h2 className="text-lg font-bold text-[#333333] mb-4">
@@ -379,7 +524,7 @@ export default function Home() {
 
               {memberGroups.length === 0 ? (
                 <p className="text-sm text-gray-500 italic">
-                  Você ainda não é membro de nenhum grupo de pesquisa. Use o campo acima para entrar com uma hash.
+                  Você ainda não é membro de nenhum grupo de pesquisa. Use a caixa de busca ou crie um novo grupo.
                 </p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -419,7 +564,7 @@ export default function Home() {
 
               {leaderGroups.length === 0 ? (
                 <p className="text-sm text-gray-500 italic">
-                  Você não é líder de nenhum grupo de pesquisa no momento.
+                  Você não é líder de nenhum grupo de pesquisa no momento. Clique no botão &quot;Criar Grupo&quot; acima para criar o seu.
                 </p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -430,7 +575,7 @@ export default function Home() {
                     >
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-xs font-bold bg-[#3E885B] text-white px-2 py-0.5 rounded">
-                          {group.group_id} (Líder)
+                          {group.group_id} (Líder / Orientador)
                         </span>
                       </div>
                       <h3 className="font-bold text-[#333333] text-base mb-2">{group.name}</h3>

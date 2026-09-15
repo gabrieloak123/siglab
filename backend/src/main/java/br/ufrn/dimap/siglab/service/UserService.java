@@ -68,9 +68,17 @@ public class UserService {
      *
      * @param user a entidade usuário a ser salva
      * @return o usuário salvo com o ID preenchido e senha criptografada
+     * @throws IllegalArgumentException se já existir um usuário cadastrado com o mesmo e-mail
      */
     @Transactional
     public User save(User user) {
+        if (user.getEmail() != null && !user.getEmail().isBlank()) {
+            String trimmedEmail = user.getEmail().trim();
+            user.setEmail(trimmedEmail);
+            if (userRepository.existsByEmail(trimmedEmail)) {
+                throw new IllegalArgumentException("Já existe um usuário cadastrado com o e-mail: " + trimmedEmail);
+            }
+        }
         if (user.getPassword() != null && !user.getPassword().isBlank()) {
             if (!isAlreadyBcryptEncoded(user.getPassword())) {
                 user.setPassword(passwordEncoder.encode(user.getPassword()));
