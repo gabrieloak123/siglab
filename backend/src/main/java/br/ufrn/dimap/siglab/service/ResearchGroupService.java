@@ -102,6 +102,7 @@ public class ResearchGroupService {
         if (!researchGroupRepository.existsById(groupId)) {
             throw new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId);
         }
+        groupInviteRepository.deleteByGroupId(groupId);
         researchGroupRepository.deleteById(groupId);
     }
 

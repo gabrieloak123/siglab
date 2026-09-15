@@ -1,5 +1,6 @@
 package br.ufrn.dimap.siglab.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -38,5 +39,6 @@ public class GroupMemberDTO {
     /**
      * Indica se o usuário é líder do grupo de pesquisa.
      */
+    @JsonProperty("isLeader")
     private boolean isLeader;
 }

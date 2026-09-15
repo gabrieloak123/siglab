@@ -9,4 +9,11 @@ import java.util.Optional;
 @Repository
 public interface GroupInviteRepository extends JpaRepository<GroupInvite, String> {
     Optional<GroupInvite> findByTokenAndUsedFalse(String token);
+
+    /**
+     * Remove todos os convites associados a um determinado grupo de pesquisa.
+     *
+     * @param groupId o ID do grupo de pesquisa
+     */
+    void deleteByGroupId(String groupId);
 }
