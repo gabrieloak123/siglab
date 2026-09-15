@@ -100,7 +100,6 @@ public class UserService {
                         }
                     }
                     user.setInterest_areas(userDetails.getInterest_areas());
-                    user.setGroups(userDetails.getGroups());
                     return userRepository.save(user);
                 })
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado com o ID: " + id));

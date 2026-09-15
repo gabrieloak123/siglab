@@ -65,12 +65,6 @@ public class User {
     private String[] interest_areas;
 
     /**
-     * Array com os identificadores dos grupos de pesquisa aos quais o usuário pertence.
-     */
-    @Column(name = "groups")
-    private String[] groups;
-
-    /**
      * Lista de associações com grupos de pesquisa através da entidade de junção {@link User_ResearchGroup}.
      */
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -78,6 +72,25 @@ public class User {
     @EqualsAndHashCode.Exclude
     @JsonIgnore
     private List<User_ResearchGroup> userResearchGroups;
+
+    /**
+     * Retorna os identificadores dos grupos de pesquisa aos quais o usuário pertence,
+     * calculados dinamicamente a partir do relacionamento com a tabela de junção.
+     *
+     * @return array de IDs dos grupos de pesquisa
+     */
+    @JsonProperty("groups")
+    public String[] getGroups() {
+        if (userResearchGroups == null) {
+            return new String[0];
+        }
+        return userResearchGroups.stream()
+                .map(User_ResearchGroup::getResearchGroup)
+                .filter(Objects::nonNull)
+                .map(ResearchGroup::getGroup_id)
+                .filter(Objects::nonNull)
+                .toArray(String[]::new);
+    }
 
     /**
      * Getter utilitário para obter o array de áreas de interesse.

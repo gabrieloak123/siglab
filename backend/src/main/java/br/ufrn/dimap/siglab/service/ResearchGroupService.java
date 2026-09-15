@@ -117,36 +117,16 @@ public class ResearchGroupService {
         }
 
         List<User_ResearchGroup> joinMembers = userResearchGroupRepository.findByGroupId(groupId);
-        Map<String, Boolean> leaderMap = joinMembers.stream()
-                .filter(m -> m.getUser() != null)
-                .collect(Collectors.toMap(m -> m.getUser().getEmail(), User_ResearchGroup::isLeader, (a, b) -> a || b));
-
-        Set<String> processedEmails = new HashSet<>();
         List<GroupMemberDTO> result = new ArrayList<>();
 
         for (User_ResearchGroup m : joinMembers) {
             if (m.getUser() != null) {
-                processedEmails.add(m.getUser().getEmail());
                 result.add(GroupMemberDTO.builder()
                         .id(m.getUser().getId())
                         .email(m.getUser().getEmail())
                         .name(m.getUser().getName())
                         .interest_areas(m.getUser().getInterest_areas())
                         .isLeader(m.isLeader())
-                        .build());
-            }
-        }
-
-        List<User> arrayUsers = userRepository.findByGroupIdInArray(groupId);
-        for (User u : arrayUsers) {
-            if (!processedEmails.contains(u.getEmail())) {
-                processedEmails.add(u.getEmail());
-                result.add(GroupMemberDTO.builder()
-                        .id(u.getId())
-                        .email(u.getEmail())
-                        .name(u.getName())
-                        .interest_areas(u.getInterest_areas())
-                        .isLeader(leaderMap.getOrDefault(u.getEmail(), false))
                         .build());
             }
         }
@@ -183,16 +163,6 @@ public class ResearchGroupService {
         userResearchGroup.setLeader(isLeader);
 
         userResearchGroupRepository.save(userResearchGroup);
-
-        if (user.getGroups() == null) {
-            user.setGroups(new String[]{groupId});
-            userRepository.save(user);
-        } else if (!Arrays.asList(user.getGroups()).contains(groupId)) {
-            List<String> groupList = new ArrayList<>(Arrays.asList(user.getGroups()));
-            groupList.add(groupId);
-            user.setGroups(groupList.toArray(new String[0]));
-            userRepository.save(user);
-        }
 
         return GroupMemberDTO.builder()
                 .id(user.getId())
@@ -235,16 +205,6 @@ public class ResearchGroupService {
         if (userResearchGroupRepository.existsById(targetId)) {
             userResearchGroupRepository.deleteById(targetId);
         }
-
-        userRepository.findByEmail(userEmail).ifPresent(user -> {
-            if (user.getGroups() != null) {
-                List<String> remainingGroups = Arrays.stream(user.getGroups())
-                        .filter(g -> !g.equals(groupId))
-                        .toList();
-                user.setGroups(remainingGroups.toArray(new String[0]));
-                userRepository.save(user);
-            }
-        });
     }
 
     /**
@@ -337,16 +297,6 @@ public class ResearchGroupService {
         userResearchGroup.setResearchGroup(researchGroup);
         userResearchGroup.setLeader(false);
         userResearchGroupRepository.save(userResearchGroup);
-
-        if (user.getGroups() == null) {
-            user.setGroups(new String[]{invite.getGroupId()});
-            userRepository.save(user);
-        } else if (!Arrays.asList(user.getGroups()).contains(invite.getGroupId())) {
-            List<String> groupList = new ArrayList<>(Arrays.asList(user.getGroups()));
-            groupList.add(invite.getGroupId());
-            user.setGroups(groupList.toArray(new String[0]));
-            userRepository.save(user);
-        }
 
         invite.setUsed(true);
         groupInviteRepository.save(invite);
