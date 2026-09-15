@@ -15,6 +15,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email);
     void deleteByEmail(String email);
 
+    /**
+     * Busca todos os usuários que possuem o ID do grupo informado em seu array {@code groups}.
+     *
+     * @param groupId o ID do grupo de pesquisa
+     * @return lista de usuários associados ao grupo
+     */
     @Query(value = "SELECT * FROM users WHERE :groupId = ANY(groups)", nativeQuery = true)
     List<User> findByGroupIdInArray(@Param("groupId") String groupId);
 }

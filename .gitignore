@@ -38,7 +38,7 @@ frontend/.vscode/
 # ============================================================
 
 # Maven
-backend/target/
+backend/target/*
 backend/.mvn/wrapper/maven-wrapper.jar
 
 # Build

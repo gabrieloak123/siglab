@@ -14,6 +14,11 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Serviço responsável por conter a lógica de negócio relacionada a Grupos de Pesquisa,
+ * atribuição de liderança, tokens de convite e gestão de membros.
+ *
+ */
 @Service
 public class ResearchGroupService {
 
@@ -32,18 +37,43 @@ public class ResearchGroupService {
         this.groupInviteRepository = groupInviteRepository;
     }
 
+    /**
+     * Retorna todos os grupos de pesquisa cadastrados.
+     *
+     * @return lista de {@link ResearchGroup}
+     */
     public List<ResearchGroup> findAll() {
         return researchGroupRepository.findAll();
     }
 
+    /**
+     * Busca um grupo de pesquisa pelo seu ID em texto.
+     *
+     * @param groupId o ID do grupo
+     * @return {@link Optional} contendo o grupo se encontrado
+     */
     public Optional<ResearchGroup> findById(String groupId) {
         return researchGroupRepository.findById(groupId);
     }
 
+    /**
+     * Salva ou cria um novo grupo de pesquisa.
+     *
+     * @param researchGroup a entidade do grupo de pesquisa
+     * @return o grupo salvo
+     */
     public ResearchGroup save(ResearchGroup researchGroup) {
         return researchGroupRepository.save(researchGroup);
     }
 
+    /**
+     * Atualiza os dados de um grupo de pesquisa existente.
+     *
+     * @param groupId o ID do grupo a ser atualizado
+     * @param groupDetails os novos dados do grupo
+     * @return o grupo de pesquisa atualizado
+     * @throws RuntimeException se o grupo não for encontrado
+     */
     public ResearchGroup update(String groupId, ResearchGroup groupDetails) {
         return researchGroupRepository.findById(groupId)
                 .map(group -> {
@@ -57,6 +87,12 @@ public class ResearchGroupService {
                 .orElseThrow(() -> new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId));
     }
 
+    /**
+     * Exclui um grupo de pesquisa pelo seu ID.
+     *
+     * @param groupId o ID do grupo a ser removido
+     * @throws RuntimeException se o grupo não for encontrado
+     */
     public void deleteById(String groupId) {
         if (!researchGroupRepository.existsById(groupId)) {
             throw new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId);
@@ -64,6 +100,17 @@ public class ResearchGroupService {
         researchGroupRepository.deleteById(groupId);
     }
 
+    /**
+     * Busca todos os usuários membros de um grupo de pesquisa.
+     * <p>
+     * Combina os membros cadastrados na tabela de junção {@code user_research_group}
+     * com os usuários que possuem o ID do grupo em seu array {@code groups}.
+     * </p>
+     *
+     * @param groupId o ID do grupo de pesquisa
+     * @return lista de DTOs {@link GroupMemberDTO} contendo dados dos usuários e se são líderes
+     * @throws RuntimeException se o grupo não for encontrado
+     */
     public List<GroupMemberDTO> findMembersByGroupId(String groupId) {
         if (!researchGroupRepository.existsById(groupId)) {
             throw new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + groupId);
@@ -107,6 +154,14 @@ public class ResearchGroupService {
         return result;
     }
 
+    /**
+     * Define ou atualiza o status de liderança de um usuário em um grupo de pesquisa.
+     *
+     * @param groupId o ID do grupo de pesquisa
+     * @param userEmail o e-mail do usuário
+     * @param isLeader {@code true} para definir como líder, {@code false} caso contrário
+     * @return DTO {@link GroupMemberDTO} com o status atualizado do usuário
+     */
     @Transactional
     public GroupMemberDTO setMemberLeadership(String groupId, String userEmail, boolean isLeader) {
         ResearchGroup researchGroup = researchGroupRepository.findById(groupId)
@@ -148,6 +203,15 @@ public class ResearchGroupService {
                 .build();
     }
 
+    /**
+     * Remove um usuário de um grupo de pesquisa. Valida se o solicitante possui permissão de líder.
+     *
+     * @param groupId o ID do grupo de pesquisa
+     * @param userEmail o e-mail do usuário a ser removido
+     * @param requesterEmail o e-mail do usuário solicitante da remoção
+     * @throws SecurityException se o solicitante não for líder do grupo
+     * @throws RuntimeException se o grupo não for encontrado
+     */
     @Transactional
     public void removeMemberFromGroup(String groupId, String userEmail, String requesterEmail) {
         if (!researchGroupRepository.existsById(groupId)) {
@@ -181,6 +245,18 @@ public class ResearchGroupService {
         });
     }
 
+    /**
+     * Gera uma nova hash/token de convite para um grupo de pesquisa.
+     * <p>
+     * Apenas líderes do grupo de pesquisa têm permissão para gerar este convite.
+     * </p>
+     *
+     * @param groupId o ID do grupo de pesquisa
+     * @param requesterEmail o e-mail do líder solicitante
+     * @param expirationDays dias até a expiração da hash (padrão 7)
+     * @return DTO {@link InviteResponseDTO} com os dados da hash gerada
+     * @throws SecurityException se o solicitante não for líder do grupo
+     */
     @Transactional
     public InviteResponseDTO generateInviteToken(String groupId, String requesterEmail, Integer expirationDays) {
         ResearchGroup researchGroup = researchGroupRepository.findById(groupId)
@@ -222,6 +298,14 @@ public class ResearchGroupService {
                 .build();
     }
 
+    /**
+     * Permite que um usuário ingresse em um grupo de pesquisa utilizando uma hash de convite válida.
+     *
+     * @param inviteToken a hash de convite
+     * @param userEmail o e-mail do usuário que está ingressando
+     * @return DTO {@link GroupMemberDTO} do usuário adicionado ao grupo
+     * @throws RuntimeException se o token for inválido, já utilizado ou expirado
+     */
     @Transactional
     public GroupMemberDTO joinGroupWithToken(String inviteToken, String userEmail) {
         GroupInvite invite = groupInviteRepository.findByTokenAndUsedFalse(inviteToken)
@@ -237,7 +321,6 @@ public class ResearchGroupService {
         ResearchGroup researchGroup = researchGroupRepository.findById(invite.getGroupId())
                 .orElseThrow(() -> new RuntimeException("Grupo de pesquisa não encontrado com o ID: " + invite.getGroupId()));
 
-        // Criar a associação do usuário no grupo como membro comum (isLeader = false)
         User_ResearchGroupId id = new User_ResearchGroupId(userEmail, invite.getGroupId());
         User_ResearchGroup userResearchGroup = userResearchGroupRepository.findById(id)
                 .orElseGet(() -> {

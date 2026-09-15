@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Controller REST responsável pelos endpoints de gerenciamento de Grupos de Pesquisa,
+ * convites por hash, ingresso de membros e atribuição de liderança.
+ *
+ */
 @RestController
 @RequestMapping("/api/research-groups")
 @CrossOrigin(origins = "*")
@@ -28,7 +33,6 @@ public class ResearchGroupController {
         List<ResearchGroup> groups = researchGroupService.findAll();
         return ResponseEntity.ok(groups);
     }
-
     @GetMapping("/{id}")
     public ResponseEntity<ResearchGroup> getResearchGroupById(@PathVariable("id") String groupId) {
         return researchGroupService.findById(groupId)
@@ -46,6 +50,14 @@ public class ResearchGroupController {
         }
     }
 
+    /**
+     * POST /api/research-groups/{groupId}/invites - Gera um token/hash de convite para um grupo de pesquisa (Apenas Líder).
+     *
+     * @param groupId o ID do grupo de pesquisa
+     * @param requesterEmail o e-mail do líder solicitante enviado no Header {@code X-Requester-Email}
+     * @param expirationDays quantidade de dias até a expiração da hash (padrão 7)
+     * @return {@link ResponseEntity} com os dados do convite gerado (201 Created) ou 403 Forbidden
+     */
     @PostMapping("/{groupId}/invites")
     public ResponseEntity<?> createInviteToken(
             @PathVariable("groupId") String groupId,
@@ -61,6 +73,12 @@ public class ResearchGroupController {
         }
     }
 
+    /**
+     * POST /api/research-groups/join - Permite que um usuário ingresse em um grupo utilizando uma hash de convite válida.
+     *
+     * @param request DTO {@link JoinGroupRequestDTO} contendo o token de convite e o e-mail do usuário
+     * @return {@link ResponseEntity} com os dados do usuário ingressado (200 OK) ou 400 Bad Request
+     */
     @PostMapping("/join")
     public ResponseEntity<?> joinGroupWithToken(@Valid @RequestBody JoinGroupRequestDTO request) {
         try {
@@ -71,6 +89,14 @@ public class ResearchGroupController {
         }
     }
 
+    /**
+     * PUT /api/research-groups/{groupId}/members/{userEmail}/leader - Promove ou altera o status de liderança de um membro no grupo.
+     *
+     * @param groupId o ID do grupo de pesquisa
+     * @param userEmail o e-mail do usuário
+     * @param isLeader {@code true} para tornar líder, {@code false} caso contrário
+     * @return {@link ResponseEntity} com os dados do membro atualizado (200 OK)
+     */
     @PutMapping("/{groupId}/members/{userEmail:.+}/leader")
     public ResponseEntity<?> setGroupLeader(
             @PathVariable("groupId") String groupId,
@@ -84,6 +110,14 @@ public class ResearchGroupController {
         }
     }
 
+    /**
+     * DELETE /api/research-groups/{groupId}/members/{userEmail} - Remove um membro do grupo de pesquisa (Apenas Líder).
+     *
+     * @param groupId o ID do grupo de pesquisa
+     * @param userEmail o e-mail do usuário a ser removido
+     * @param requesterEmail o e-mail do solicitante enviado no Header {@code X-Requester-Email}
+     * @return {@link ResponseEntity} sem conteúdo (204 No Content), 403 Forbidden ou 404 Not Found
+     */
     @DeleteMapping("/{groupId}/members/{userEmail:.+}")
     public ResponseEntity<?> removeMemberFromGroup(
             @PathVariable("groupId") String groupId,

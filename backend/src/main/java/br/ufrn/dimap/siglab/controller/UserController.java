@@ -9,6 +9,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Controller REST responsável pelos endpoints de gerenciamento de Usuários.
+ *
+ */
 @RestController
 @RequestMapping("/api/users")
 @CrossOrigin(origins = "*")
