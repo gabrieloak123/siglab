@@ -1,9 +1,9 @@
 import { isSameEmail } from "@/lib/utils";
-import type { GroupMember, ResearchGroup, User } from "@/types";
+import type { GroupMember, KanbanBoard, KanbanTask, ResearchGroup, User } from "@/types";
 
-const DEFAULT_API_URL = "http://localhost:8080";
+const DEFAULT_API_URL = "/backend-api";
 
-export const getApiUrl = () => process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL;
+export const getApiUrl = () => DEFAULT_API_URL;
 
 export class ApiError extends Error {
   readonly serverMessage?: string;
@@ -115,4 +115,51 @@ export const groupsApi = {
       `/api/research-groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userEmail)}/leader?isLeader=${isLeader}`,
       { method: "PUT" }
     ),
+};
+
+export interface CreateTaskPayload {
+  id_criado_por: number;
+  id_atribuido_a: number | null;
+  id_coluna: number;
+  titulo: string;
+  descricao: string | null;
+  tags: string[];
+}
+
+export interface UpdateTaskPayload {
+  id_atribuido_a: number | null;
+  titulo: string;
+  descricao: string | null;
+  tags: string[];
+}
+
+const boardPath = (groupId: string) =>
+  `/api/research-groups/${encodeURIComponent(groupId)}`;
+
+export const kanbanApi = {
+  board: (groupId: string) =>
+    request<KanbanBoard>(`${boardPath(groupId)}/board`),
+
+  createTask: (groupId: string, payload: CreateTaskPayload) =>
+    request<KanbanTask>(`${boardPath(groupId)}/tasks`, {
+      method: "POST",
+      ...jsonBody(payload),
+    }),
+
+  updateTask: (groupId: string, taskId: number, payload: UpdateTaskPayload) =>
+    request<KanbanTask>(`${boardPath(groupId)}/tasks/${taskId}`, {
+      method: "PUT",
+      ...jsonBody(payload),
+    }),
+
+  moveTask: (groupId: string, taskId: number, columnId: number) =>
+    request<KanbanTask>(`${boardPath(groupId)}/tasks/${taskId}/column`, {
+      method: "PATCH",
+      ...jsonBody({ id_coluna_destino: columnId }),
+    }),
+
+  removeTask: (groupId: string, taskId: number) =>
+    request<void>(`${boardPath(groupId)}/tasks/${taskId}`, {
+      method: "DELETE",
+    }),
 };
