@@ -17,7 +17,7 @@ export interface UseResearchGroups {
   memberGroups: ResearchGroup[];
   leaderGroups: ResearchGroup[];
   generatedTokens: Record<string, string>;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<boolean>;
   createGroup: (payload: {
     group_id: string;
     name: string;
@@ -92,16 +92,25 @@ export const useResearchGroups = (
       if (user) {
         await loadMemberships(user.email, groups);
       }
+      return true;
     } catch (error) {
       console.error("Erro ao atualizar a lista de grupos:", error);
+      return false;
     }
   }, [user, loadGroups, loadMemberships]);
 
+  const { fail } = feedback;
+
   useEffect(() => {
     void (async () => {
-      await refresh();
+      const loaded = await refresh();
+      if (!loaded) {
+        fail(
+          "Não foi possível carregar os grupos. Verifique se a API está em execução."
+        );
+      }
     })();
-  }, [refresh]);
+  }, [refresh, fail]);
 
   const createGroup = async (payload: {
     group_id: string;
