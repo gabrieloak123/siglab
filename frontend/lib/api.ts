@@ -1,5 +1,12 @@
 import { isSameEmail } from "@/lib/utils";
-import type { GroupMember, KanbanBoard, KanbanTask, ResearchGroup, User } from "@/types";
+import type {
+  GroupMember,
+  KanbanBoard,
+  KanbanTask,
+  Post,
+  ResearchGroup,
+  User,
+} from "@/types";
 
 const DEFAULT_API_URL = "/backend-api";
 
@@ -31,8 +38,11 @@ const readServerMessage = async (res: Response) => {
   return data?.message as string | undefined;
 };
 
-const jsonBody = (payload: unknown): RequestInit => ({
-  headers: { "Content-Type": "application/json" },
+const jsonBody = (
+  payload: unknown,
+  extraHeaders: Record<string, string> = {}
+): RequestInit => ({
+  headers: { "Content-Type": "application/json", ...extraHeaders },
   body: JSON.stringify(payload),
 });
 
@@ -161,5 +171,52 @@ export const kanbanApi = {
   removeTask: (groupId: string, taskId: number) =>
     request<void>(`${boardPath(groupId)}/tasks/${taskId}`, {
       method: "DELETE",
+    }),
+};
+
+export interface PostPayload {
+  title: string;
+  description: string | null;
+  content: string;
+  tags: string[];
+  filePath: string | null;
+}
+
+const requesterHeaders = (requesterEmail: string) => ({
+  "X-Requester-Email": requesterEmail,
+});
+
+export const postsApi = {
+  list: (groupId: string, requesterEmail: string) =>
+    request<Post[]>(`${boardPath(groupId)}/posts`, {
+      headers: requesterHeaders(requesterEmail),
+    }),
+
+  get: (groupId: string, postId: number, requesterEmail: string) =>
+    request<Post>(`${boardPath(groupId)}/posts/${postId}`, {
+      headers: requesterHeaders(requesterEmail),
+    }),
+
+  create: (groupId: string, requesterEmail: string, payload: PostPayload) =>
+    request<Post>(`${boardPath(groupId)}/posts`, {
+      method: "POST",
+      ...jsonBody(payload, requesterHeaders(requesterEmail)),
+    }),
+
+  update: (
+    groupId: string,
+    postId: number,
+    requesterEmail: string,
+    payload: PostPayload
+  ) =>
+    request<Post>(`${boardPath(groupId)}/posts/${postId}`, {
+      method: "PUT",
+      ...jsonBody(payload, requesterHeaders(requesterEmail)),
+    }),
+
+  remove: (groupId: string, postId: number, requesterEmail: string) =>
+    request<void>(`${boardPath(groupId)}/posts/${postId}`, {
+      method: "DELETE",
+      headers: requesterHeaders(requesterEmail),
     }),
 };

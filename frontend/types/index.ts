@@ -45,4 +45,16 @@ export interface KanbanBoard {
   colunas: KanbanColumn[];
 }
 
+export interface Post {
+  id: number;
+  groupId: string;
+  publisherUserId?: number | null;
+  title: string;
+  description?: string | null;
+  content?: string | null;
+  tags?: string[] | null;
+  filePath?: string | null;
+  createdAt?: string | null;
+}
+
 export type AuthTab = "login" | "register";

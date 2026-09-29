@@ -7,13 +7,11 @@ import { PublicGroupsSection } from "@/components/groups/PublicGroupsSection";
 import { AppFooter } from "@/components/layout/AppFooter";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AuthModal } from "@/components/modals/AuthModal";
-import { GroupModal } from "@/components/modals/GroupModal";
 import { ProfileModal } from "@/components/modals/ProfileModal";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { useAuth, type ProfilePayload } from "@/hooks/useAuth";
 import { useFeedback } from "@/hooks/useFeedback";
-import { useResearchGroups, type GroupDraft } from "@/hooks/useResearchGroups";
-import type { ResearchGroup } from "@/types";
+import { useResearchGroups } from "@/hooks/useResearchGroups";
 
 export default function Home() {
   const feedback = useFeedback();
@@ -22,11 +20,6 @@ export default function Home() {
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<ResearchGroup | null>(
-    null
-  );
-
   const openAuthModal = () => {
     feedback.clear();
     setIsAuthModalOpen(true);
@@ -38,12 +31,6 @@ export default function Home() {
     setIsProfileModalOpen(true);
   };
 
-  const openGroupModal = (group: ResearchGroup) => {
-    feedback.clear();
-    setSelectedGroup(group);
-    setIsGroupModalOpen(true);
-  };
-
   const handleUpdateProfile = async (payload: ProfilePayload) => {
     const updatedUser = await auth.updateProfile(payload);
     if (!updatedUser) return null;
@@ -51,25 +38,6 @@ export default function Home() {
     setIsProfileModalOpen(false);
     await groups.refresh();
     return updatedUser;
-  };
-
-  const handleUpdateGroup = async (payload: GroupDraft) => {
-    if (!selectedGroup) return false;
-
-    const updated = await groups.updateGroup(selectedGroup, payload);
-    if (updated) setIsGroupModalOpen(false);
-    return updated;
-  };
-
-  const handleDeleteGroup = async (password: string) => {
-    if (!selectedGroup) return false;
-
-    const deleted = await groups.deleteGroup(selectedGroup, password);
-    if (deleted) {
-      setIsGroupModalOpen(false);
-      setSelectedGroup(null);
-    }
-    return deleted;
   };
 
   const handleDeleteProfile = async (password: string) => {
@@ -97,11 +65,7 @@ export default function Home() {
         <AlertBanner message={feedback.success} variant="success" />
 
         {auth.user ? (
-          <Dashboard
-            groups={groups}
-            feedback={feedback}
-            onManageGroup={openGroupModal}
-          />
+          <Dashboard groups={groups} feedback={feedback} />
         ) : (
           <PublicGroupsSection groups={groups.allGroups} />
         )}
@@ -130,16 +94,6 @@ export default function Home() {
           onClose={() => setIsProfileModalOpen(false)}
           onUpdateProfile={handleUpdateProfile}
           onDeleteProfile={handleDeleteProfile}
-        />
-      )}
-
-      {isGroupModalOpen && selectedGroup && (
-        <GroupModal
-          group={selectedGroup}
-          feedback={feedback}
-          onClose={() => setIsGroupModalOpen(false)}
-          onUpdateGroup={handleUpdateGroup}
-          onDeleteGroup={handleDeleteGroup}
         />
       )}
 

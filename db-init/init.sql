@@ -92,14 +92,20 @@ CREATE TABLE IF NOT EXISTS user_research_group (
 -- 6. Posts do grupo
 CREATE TABLE IF NOT EXISTS posts (
     id BIGSERIAL PRIMARY KEY,
-    group_id VARCHAR(255),
+    group_id VARCHAR(255) NOT NULL,
     publisher_user_id BIGINT,
-    title VARCHAR(255),
+    title VARCHAR(255) NOT NULL,
     description TEXT,
+    content TEXT,
     tags TEXT[],
     file_path VARCHAR(500),
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
     CONSTRAINT fk_posts_publisher
         FOREIGN KEY (publisher_user_id) REFERENCES users (id) ON DELETE SET NULL,
     CONSTRAINT fk_posts_research_group
         FOREIGN KEY (group_id) REFERENCES research_group (group_id) ON DELETE CASCADE ON UPDATE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_posts_group
+    ON posts (group_id);
+

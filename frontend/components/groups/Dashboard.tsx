@@ -4,19 +4,13 @@ import { LeaderGroupsSection } from "@/components/groups/LeaderGroupsSection";
 import { MemberGroupsSection } from "@/components/groups/MemberGroupsSection";
 import type { Feedback } from "@/hooks/useFeedback";
 import type { UseResearchGroups } from "@/hooks/useResearchGroups";
-import type { ResearchGroup } from "@/types";
 
 interface DashboardProps {
   groups: UseResearchGroups;
   feedback: Feedback;
-  onManageGroup: (group: ResearchGroup) => void;
 }
 
-export function Dashboard({
-  groups,
-  feedback,
-  onManageGroup,
-}: DashboardProps) {
+export function Dashboard({ groups, feedback }: DashboardProps) {
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -30,7 +24,6 @@ export function Dashboard({
         groups={groups.leaderGroups}
         generatedTokens={groups.generatedTokens}
         onGenerateInvite={groups.generateInvite}
-        onManageGroup={onManageGroup}
       />
     </div>
   );

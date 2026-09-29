@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { GroupBadge } from "@/components/ui/GroupBadge";
 import type { ResearchGroup } from "@/types";
 
@@ -5,14 +7,12 @@ interface LeaderGroupsSectionProps {
   groups: ResearchGroup[];
   generatedTokens: Record<string, string>;
   onGenerateInvite: (groupId: string) => void;
-  onManageGroup: (group: ResearchGroup) => void;
 }
 
 export function LeaderGroupsSection({
   groups,
   generatedTokens,
   onGenerateInvite,
-  onManageGroup,
 }: LeaderGroupsSectionProps) {
   return (
     <section className="bg-white p-6 rounded border border-gray-300">
@@ -56,12 +56,12 @@ export function LeaderGroupsSection({
                   >
                     Gerar Hash
                   </button>
-                  <button
-                    onClick={() => onManageGroup(group)}
-                    className="btn-green text-xs flex-1"
+                  <Link
+                    href={`/groups/${encodeURIComponent(group.group_id)}/settings`}
+                    className="btn-green text-xs flex-1 text-center"
                   >
                     Gerenciar Grupo
-                  </button>
+                  </Link>
                 </div>
 
                 {generatedTokens[group.group_id] && (
@@ -82,4 +82,3 @@ export function LeaderGroupsSection({
     </section>
   );
 }
-import Link from "next/link";

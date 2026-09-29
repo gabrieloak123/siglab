@@ -5,6 +5,8 @@ const BASE_INPUT =
 
 export const inputClassName = `${BASE_INPUT} w-full focus:border-[#3E885B]`;
 
+export const textareaClassName = `${BASE_INPUT} w-full focus:border-[#3E885B] resize-y min-h-24`;
+
 export const dangerInputClassName = `${BASE_INPUT} w-full focus:border-[#BF3100]`;
 
 export const inlineInputClassName = `${BASE_INPUT} flex-1 focus:border-[#3E885B]`;

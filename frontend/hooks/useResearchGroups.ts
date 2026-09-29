@@ -7,11 +7,6 @@ import { isSameEmail } from "@/lib/utils";
 import type { GroupMember, ResearchGroup, User } from "@/types";
 import type { Feedback } from "./useFeedback";
 
-export interface GroupDraft {
-  name: string;
-  research_fields: string[];
-}
-
 export interface UseResearchGroups {
   allGroups: ResearchGroup[];
   memberGroups: ResearchGroup[];
@@ -25,8 +20,6 @@ export interface UseResearchGroups {
   }) => Promise<boolean>;
   joinGroup: (inviteToken: string) => Promise<boolean>;
   generateInvite: (groupId: string) => Promise<boolean>;
-  updateGroup: (group: ResearchGroup, payload: GroupDraft) => Promise<boolean>;
-  deleteGroup: (group: ResearchGroup, password: string) => Promise<boolean>;
 }
 
 export const useResearchGroups = (
@@ -205,57 +198,6 @@ export const useResearchGroups = (
     }
   };
 
-  const updateGroup = async (group: ResearchGroup, payload: GroupDraft) => {
-    if (!user) return false;
-
-    feedback.begin();
-    try {
-      await groupsApi.update(group.group_id, {
-        name: payload.name.trim(),
-        research_fields: payload.research_fields,
-      });
-      feedback.succeed(
-        `Grupo '${group.group_id}' atualizado com sucesso!`
-      );
-      await refresh();
-      return true;
-    } catch (error) {
-      feedback.fail(
-        messageOf(error, {
-          api: "Erro ao atualizar dados do grupo.",
-          network: "Falha ao comunicar com o servidor ao atualizar grupo.",
-        })
-      );
-      return false;
-    } finally {
-      feedback.setLoading(false);
-    }
-  };
-
-  const deleteGroup = async (group: ResearchGroup, password: string) => {
-    if (!user) return false;
-
-    feedback.begin();
-    try {
-      await groupsApi.remove(group.group_id, password.trim(), user.email);
-      feedback.succeed(
-        `Grupo de pesquisa '${group.group_id}' excluído com sucesso.`
-      );
-      await refresh();
-      return true;
-    } catch (error) {
-      feedback.fail(
-        messageOf(error, {
-          api: "Senha do orientador incorreta ou você não possui permissão para excluir este grupo.",
-          network: "Falha na comunicação com o servidor ao excluir o grupo.",
-        })
-      );
-      return false;
-    } finally {
-      feedback.setLoading(false);
-    }
-  };
-
   return {
     allGroups,
     memberGroups,
@@ -265,7 +207,5 @@ export const useResearchGroups = (
     createGroup,
     joinGroup,
     generateInvite,
-    updateGroup,
-    deleteGroup,
   };
 };

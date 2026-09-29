@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { GroupBadge } from "@/components/ui/GroupBadge";
 import { ResearchFieldTags } from "@/components/ui/ResearchFieldTags";
 import type { ResearchGroup } from "@/types";
@@ -49,4 +51,3 @@ export function MemberGroupsSection({ groups }: MemberGroupsSectionProps) {
     </section>
   );
 }
-import Link from "next/link";

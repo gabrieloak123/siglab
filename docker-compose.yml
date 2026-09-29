@@ -67,9 +67,10 @@ services:
       - "3000:3000"
 
     environment:
-      # NEXT_PUBLIC_ vars are inlined into the browser bundle, so this must be
-      # reachable from the browser (not a docker-internal hostname like "backend").
-      NEXT_PUBLIC_API_URL: http://localhost:8080
+      # The browser only calls "/backend-api" on this same origin and the Next
+      # server proxies it to the backend, so this value must be the
+      # docker-internal hostname (it is never exposed to the browser).
+      BACKEND_URL: http://backend:8080
 
     depends_on:
       - backend
