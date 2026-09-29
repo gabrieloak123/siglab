@@ -20,4 +20,29 @@ export interface User {
   interest_areas?: string[];
 }
 
+export interface KanbanTask {
+  id: number;
+  id_grupo: string;
+  id_criado_por: number;
+  id_atribuido_a?: number | null;
+  titulo: string;
+  descricao?: string | null;
+  tags?: string[] | null;
+  id_coluna: number;
+}
+
+export interface KanbanColumn {
+  id: number;
+  nome: string;
+  ordem: number;
+  id_grupo_pesquisa: string;
+  tarefas: KanbanTask[];
+}
+
+export interface KanbanBoard {
+  id: string;
+  id_grupo_pesquisa: string;
+  colunas: KanbanColumn[];
+}
+
 export type AuthTab = "login" | "register";

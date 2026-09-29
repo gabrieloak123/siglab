@@ -39,7 +39,12 @@ export function LeaderGroupsSection({
                   </GroupBadge>
                 </div>
                 <h3 className="font-bold text-[#333333] text-base mb-3">
-                  {group.name}
+                  <Link
+                    href={`/groups/${encodeURIComponent(group.group_id)}`}
+                    className="hover:text-[#3E885B] hover:underline underline-offset-4 transition-colors"
+                  >
+                    {group.name}
+                  </Link>
                 </h3>
               </div>
 
@@ -77,3 +82,4 @@ export function LeaderGroupsSection({
     </section>
   );
 }
+import Link from "next/link";

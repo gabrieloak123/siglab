@@ -29,7 +29,12 @@ export function MemberGroupsSection({ groups }: MemberGroupsSectionProps) {
                 <GroupBadge>{group.group_id}</GroupBadge>
               </div>
               <h3 className="font-bold text-[#333333] text-base mb-1">
-                {group.name}
+                <Link
+                  href={`/groups/${encodeURIComponent(group.group_id)}`}
+                  className="hover:text-[#3E885B] hover:underline underline-offset-4 transition-colors"
+                >
+                  {group.name}
+                </Link>
               </h3>
               {group.research_fields && group.research_fields.length > 0 && (
                 <ResearchFieldTags
@@ -44,3 +49,4 @@ export function MemberGroupsSection({ groups }: MemberGroupsSectionProps) {
     </section>
   );
 }
+import Link from "next/link";
