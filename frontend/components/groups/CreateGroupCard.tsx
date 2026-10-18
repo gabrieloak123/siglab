@@ -22,9 +22,9 @@ export function CreateGroupCard({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (!groupId.trim() || !name.trim()) {
+    if (!groupId.trim() || !name.trim() || parseList(fields).length !== 3) {
       feedback.fail(
-        "Por favor, informe o Código ID e o Nome do Grupo de Pesquisa."
+        "Informe o Código ID, o nome e exatamente três linhas de pesquisa."
       );
       return;
     }
@@ -88,9 +88,10 @@ export function CreateGroupCard({
             />
           </FormField>
 
-          <FormField label="Linhas de Pesquisa (Separadas por vírgula)">
+          <FormField label="Três linhas de pesquisa (separadas por vírgula)">
             <input
               type="text"
+              required
               placeholder="Ex: Robótica Móvel, Sistemas Autônomos"
               value={fields}
               onChange={(e) => setFields(e.target.value)}

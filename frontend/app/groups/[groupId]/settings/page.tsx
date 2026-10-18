@@ -31,6 +31,10 @@ function GroupSettingsForm({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (parseList(fields).length !== 3) {
+      feedback.fail("Informe exatamente três linhas de pesquisa.");
+      return;
+    }
     feedback.begin();
 
     try {

@@ -160,23 +160,18 @@ export default function PostDetailPage() {
             onCancel={() => setIsEditing(false)}
             onSubmit={async (payload) => {
               feedback.begin();
-              const updated = await postsApi.update(
-                groupId,
-                post.id,
-                requesterEmail as string,
-                payload
-              );
-              feedback.setLoading(false);
-
-              if (!updated) {
-                feedback.fail("Não foi possível atualizar o post.");
+              try {
+                const updated = await postsApi.update(groupId, post.id, requesterEmail as string, payload);
+                setPost(updated);
+                setIsEditing(false);
+                feedback.succeed("Post atualizado com sucesso!");
+                return true;
+              } catch (caught) {
+                feedback.fail(messageOf(caught, { api: "Não foi possível atualizar o post.", network: "Falha de conexão." }));
                 return false;
+              } finally {
+                feedback.setLoading(false);
               }
-
-              setPost(updated);
-              setIsEditing(false);
-              feedback.succeed("Post atualizado com sucesso!");
-              return true;
             }}
           />
         </div>

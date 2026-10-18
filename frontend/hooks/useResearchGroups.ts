@@ -124,15 +124,6 @@ export const useResearchGroups = (
 
       await groupsApi.create({ ...payload, group_id: groupId, name });
 
-      try {
-        await groupsApi.setLeader(groupId, user.email, true);
-      } catch {
-        feedback.fail(
-          "Grupo criado, mas ocorreu uma falha ao registrar o líder."
-        );
-        return false;
-      }
-
       feedback.succeed(
         `Grupo de pesquisa '${name}' criado com sucesso! Você foi definido como líder/orientador.`
       );
