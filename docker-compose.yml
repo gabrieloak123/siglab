@@ -1,79 +1,66 @@
 services:
   db:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: siglab-db
     restart: always
-
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-
     ports:
       - "5433:5432"
-
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db-init:/docker-entrypoint-initdb.d:z
-
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U siglab -d siglab"]
       interval: 5s
       timeout: 5s
       retries: 10
-
   backend:
     image: maven:3.9-eclipse-temurin-25
     container_name: siglab-backend
     working_dir: /app
-
     volumes:
       - ./backend:/app:z
       - ~/.m2:/root/.m2:z
-
     command: mvn spring-boot:run
-
     ports:
       - "8080:8080"
-
     environment:
       SPRING_DATASOURCE_URL: ${POSTGRES_URL}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER} 
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
-
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_JPA_SHOW_SQL: "true"
-      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "true"
-      SMTP_USERNAME: ${SMTP_USERNAME}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-
+      SERPAPI_KEY: ${SERPAPI_KEY:-}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      ORCID_CLIENT_ID: ${ORCID_CLIENT_ID:-}
+      ORCID_CLIENT_SECRET: ${ORCID_CLIENT_SECRET:-}
+      ORCID_REDIRECT_URI: ${ORCID_REDIRECT_URI:-http://localhost:3000/backend-api/api/auth/orcid/callback}
+      ORCID_BASE_URL: ${ORCID_BASE_URL:-https://orcid.org}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
     depends_on:
       db:
         condition: service_healthy
-
   frontend:
     image: node:24-bookworm-slim
     container_name: siglab-frontend
     working_dir: /app
-
     volumes:
       - ./frontend:/app:z
       - /app/node_modules
-
     command: sh -c "npm install && npm run dev"
-
     ports:
       - "3000:3000"
-
     environment:
-      # The browser only calls "/backend-api" on this same origin and the Next
-      # server proxies it to the backend, so this value must be the
-      # docker-internal hostname (it is never exposed to the browser).
       BACKEND_URL: http://backend:8080
-
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     depends_on:
       - backend
-
 volumes:
   pgdata:
