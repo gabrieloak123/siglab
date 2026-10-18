@@ -24,6 +24,13 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(ExternalServiceException.class)
+    public ResponseEntity<ErrorResponseDTO> handleExternal(ExternalServiceException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ErrorResponseDTO.builder()
+                .timestamp(LocalDateTime.now()).status(503).error("Serviço indisponível")
+                .message(ex.getMessage()).path(request.getRequestURI()).build());
+    }
+
     /**
      * Trata exceções de recursos não encontrados (HTTP 404 Not Found).
      *
