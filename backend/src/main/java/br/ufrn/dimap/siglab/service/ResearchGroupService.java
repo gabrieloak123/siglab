@@ -28,17 +28,19 @@ public class ResearchGroupService {
     private final UserRepository userRepository;
     private final GroupInviteRepository groupInviteRepository;
     private final PasswordEncoder passwordEncoder;
+    private final InterestService interests;
 
     public ResearchGroupService(ResearchGroupRepository researchGroupRepository,
                                 User_ResearchGroupRepository userResearchGroupRepository,
                                 UserRepository userRepository,
                                 GroupInviteRepository groupInviteRepository,
-                                PasswordEncoder passwordEncoder) {
+                                PasswordEncoder passwordEncoder, InterestService interests) {
         this.researchGroupRepository = researchGroupRepository;
         this.userResearchGroupRepository = userResearchGroupRepository;
         this.userRepository = userRepository;
         this.groupInviteRepository = groupInviteRepository;
         this.passwordEncoder = passwordEncoder;
+        this.interests = interests;
     }
 
     /**
@@ -71,6 +73,7 @@ public class ResearchGroupService {
      */
     @Transactional
     public ResearchGroup save(ResearchGroup researchGroup) {
+        researchGroup.setResearch_fields(interests.three(researchGroup.getResearch_fields()));
         if (researchGroup.getGroup_id() != null && !researchGroup.getGroup_id().isBlank()) {
             String trimmedId = researchGroup.getGroup_id().trim();
             researchGroup.setGroup_id(trimmedId);
@@ -78,7 +81,23 @@ public class ResearchGroupService {
                 throw new IllegalArgumentException("Já existe um grupo de pesquisa cadastrado com o ID: " + trimmedId);
             }
         }
-        return researchGroupRepository.save(researchGroup);
+        ResearchGroup saved = researchGroupRepository.saveAndFlush(researchGroup);
+        interests.index(saved);
+        return saved;
+    }
+
+    @Transactional
+    public ResearchGroup createForUser(ResearchGroup group, String email) {
+        ResearchGroup saved = save(group);
+        setMemberLeadership(saved.getGroup_id(), email, true);
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public void requireLeader(String groupId, String email) {
+        if (!userResearchGroupRepository.findById(new User_ResearchGroupId(email, groupId))
+                .map(User_ResearchGroup::isLeader).orElse(false))
+            throw new SecurityException("Apenas líderes do grupo podem executar esta ação.");
     }
 
     /**
@@ -94,11 +113,13 @@ public class ResearchGroupService {
         return researchGroupRepository.findById(groupId)
                 .map(group -> {
                     group.setName(groupDetails.getName());
-                    group.setResearch_fields(groupDetails.getResearch_fields());
+                    group.setResearch_fields(interests.three(groupDetails.getResearch_fields()));
                     if (groupDetails.getMembers() != null) {
                         group.setMembers(groupDetails.getMembers());
                     }
-                    return researchGroupRepository.save(group);
+                    ResearchGroup saved = researchGroupRepository.save(group);
+                    interests.index(saved);
+                    return saved;
                 })
                 .orElseThrow(() -> new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId));
     }
