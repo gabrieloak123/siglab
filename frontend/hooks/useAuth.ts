@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { messageOf, usersApi } from "@/lib/api";
+import { authApi, messageOf, usersApi } from "@/lib/api";
 import { clearStoredUser, readStoredUser, writeStoredUser } from "@/lib/storage";
 import type { User } from "@/types";
 import type { Feedback } from "./useFeedback";
@@ -12,6 +12,7 @@ export interface RegisterPayload {
   email: string;
   password: string;
   interest_areas: string[];
+  authorId: string;
 }
 
 export interface ProfilePayload {
@@ -19,11 +20,13 @@ export interface ProfilePayload {
   email: string;
   interest_areas: string[];
   password?: string;
+  authorId: string;
 }
 
 export interface UseAuth {
   user: User | null;
-  login: (email: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
+  googleLogin: (credential: string, authorId: string, interestAreas: string[]) => Promise<boolean>;
   register: (payload: RegisterPayload) => Promise<boolean>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -38,26 +41,19 @@ export const useAuth = (feedback: Feedback): UseAuth => {
     const stored = readStoredUser();
     if (!stored) return;
 
-    usersApi
-      .findByEmail(stored.email)
+    authApi
+      .me()
       .then((fresh) => {
-        if (fresh) writeStoredUser(fresh);
-        setUser(fresh ?? stored);
+        writeStoredUser(fresh);
+        setUser(fresh);
       })
-      .catch(() => setUser(stored));
+      .catch(() => { clearStoredUser(); setUser(null); });
   }, []);
 
-  const login = async (email: string) => {
+  const login = async (email: string, password: string) => {
     feedback.begin();
     try {
-      const found = await usersApi.findByEmail(email.trim());
-
-      if (!found) {
-        feedback.fail(
-          "Usuário não encontrado com este e-mail. Se for novo, selecione a aba 'Cadastrar'."
-        );
-        return false;
-      }
+      const found = await authApi.login(email.trim(), password);
 
       setUser(found);
       writeStoredUser(found);
@@ -79,11 +75,12 @@ export const useAuth = (feedback: Feedback): UseAuth => {
   const register = async (payload: RegisterPayload) => {
     feedback.begin();
     try {
-      const newUser = await usersApi.create({
-        ...payload,
+      const newUser = await authApi.register({
         name: payload.name.trim(),
         email: payload.email.trim(),
-        password: payload.password.trim(),
+        password: payload.password,
+        authorId: payload.authorId.trim(),
+        interestAreas: payload.interest_areas,
       });
 
       setUser(newUser);
@@ -105,7 +102,22 @@ export const useAuth = (feedback: Feedback): UseAuth => {
     }
   };
 
+  const googleLogin = async (credential: string, authorId: string, interestAreas: string[]) => {
+    feedback.begin();
+    try {
+      const found = await authApi.google(credential, authorId, interestAreas);
+      setUser(found);
+      writeStoredUser(found);
+      feedback.succeed(`Bem-vindo(a), ${found.name}!`);
+      return true;
+    } catch (error) {
+      feedback.fail(messageOf(error, { api: "Falha na entrada com Google.", network: "Falha de conexão." }));
+      return false;
+    } finally { feedback.setLoading(false); }
+  };
+
   const logout = () => {
+    void authApi.logout().catch(console.error);
     setUser(null);
     clearStoredUser();
     feedback.succeed("Sessão encerrada com sucesso.");
@@ -114,7 +126,7 @@ export const useAuth = (feedback: Feedback): UseAuth => {
   const refreshUser = async () => {
     if (!user) return;
     try {
-      const found = await usersApi.findByEmail(user.email);
+      const found = await authApi.me();
       if (!found) return;
       setUser(found);
       writeStoredUser(found);
@@ -137,6 +149,7 @@ export const useAuth = (feedback: Feedback): UseAuth => {
         name: payload.name.trim(),
         email: payload.email.trim(),
         interest_areas: payload.interest_areas,
+        authorId: payload.authorId,
         ...(payload.password?.trim()
           ? { password: payload.password.trim() }
           : {}),
@@ -187,6 +200,7 @@ export const useAuth = (feedback: Feedback): UseAuth => {
   return {
     user,
     login,
+    googleLogin,
     register,
     logout,
     refreshUser,
