@@ -19,6 +19,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final InterestService interests;
 
     /**
      * Construtor para injeção de dependências do repositório de usuários e codificador de senhas.
@@ -26,9 +27,10 @@ public class UserService {
      * @param userRepository o repositório {@link UserRepository}
      * @param passwordEncoder o codificador de senhas {@link PasswordEncoder}
      */
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, InterestService interests) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.interests = interests;
     }
 
     /**
@@ -72,6 +74,13 @@ public class UserService {
      */
     @Transactional
     public User save(User user) {
+        if (user.getAuthorId() != null && !user.getAuthorId().isBlank()) {
+            user.setAuthorId(user.getAuthorId().trim());
+            if (userRepository.existsByAuthorId(user.getAuthorId())) throw new IllegalArgumentException("author_id já cadastrado.");
+        } else {
+            user.setAuthorId(null);
+        }
+        user.setInterest_areas(interests.three(user.getInterest_areas()));
         if (user.getEmail() != null && !user.getEmail().isBlank()) {
             String trimmedEmail = user.getEmail().trim();
             user.setEmail(trimmedEmail);
@@ -84,7 +93,9 @@ public class UserService {
                 user.setPassword(passwordEncoder.encode(user.getPassword()));
             }
         }
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        interests.index(saved);
+        return saved;
     }
 
     /**
@@ -97,6 +108,9 @@ public class UserService {
      */
     @Transactional
     public User update(Long id, User userDetails) {
+        if (userDetails.getName() == null || userDetails.getName().isBlank()
+                || userDetails.getEmail() == null || userDetails.getEmail().isBlank())
+            throw new IllegalArgumentException("Nome e e-mail são obrigatórios.");
         return userRepository.findById(id)
                 .map(user -> {
                     user.setName(userDetails.getName());
@@ -108,8 +122,21 @@ public class UserService {
                             user.setPassword(userDetails.getPassword());
                         }
                     }
-                    user.setInterest_areas(userDetails.getInterest_areas());
-                    return userRepository.save(user);
+                    String[] requestedAreas = userDetails.getInterest_areas();
+                    boolean scholarChanged = false;
+                    if (userDetails.getAuthorId() != null && !userDetails.getAuthorId().isBlank()) {
+                        String authorId = userDetails.getAuthorId().trim();
+                        if (!authorId.equals(user.getAuthorId()) && userRepository.existsByAuthorId(authorId))
+                            throw new IllegalArgumentException("author_id já cadastrado.");
+                        scholarChanged = !authorId.equals(user.getAuthorId());
+                        user.setAuthorId(authorId);
+                    }
+                    user.setInterest_areas(scholarChanged
+                            ? interests.withScholar(user.getAuthorId(), requestedAreas)
+                            : interests.three(requestedAreas));
+                    User saved = userRepository.save(user);
+                    interests.index(saved);
+                    return saved;
                 })
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o ID: " + id));
     }
