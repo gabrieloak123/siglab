@@ -7,6 +7,43 @@ To run
 docker compose up --build
 ```
 
+## Sprint 3: rede e recomendações
+
+Copie `.env-example` para `.env` e configure `SERPAPI_KEY`, `CLOUDFLARE_ACCOUNT_ID`,
+`CLOUDFLARE_API_TOKEN`, `GEMINI_API_KEY` e `GOOGLE_CLIENT_ID`. O cadastro consulta
+o perfil público pelo `author_id` usando [SerpApi](https://serpapi.com/google-scholar-author-api),
+exige três áreas distintas e grava vetores de 1024 dimensões do
+[`@cf/baai/bge-m3`](https://developers.cloudflare.com/workers-ai/models/bge-m3/)
+no PostgreSQL com pgvector. Posts do tipo Outros recebem três palavras-chave
+do [`gemini-3.5-flash-lite`](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite);
+artigos usam as palavras-chave informadas pelo autor. O feed em `/posts` ordena
+por similaridade e depois por data; o painel inicial recomenda os três perfis
+ou grupos mais semelhantes ainda não seguidos. Dados anteriores são indexados
+quando a rede ou o feed são acessados pela primeira vez.
+
+O botão de entrada com Google usa [Google Identity](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
+No primeiro acesso, o usuário deve informar exatamente três áreas de interesse;
+o `author_id` é opcional e, quando informado, busca áreas no perfil público Scholar.
+A API pública do Scholar não oferece autenticação do titular
+nem fornece `author_id` na credencial Google; portanto, o vínculo informado não
+prova a propriedade do perfil Scholar. Configure no Google Cloud um ID de cliente
+OAuth para a origem do frontend (por exemplo `http://localhost:3000`).
+Quem já possui uma conta com senha pode vinculá-la ao Google em Gerenciar Perfil;
+o e-mail da credencial Google precisa coincidir com o da conta.
+
+No primeiro acesso Google, o SIGLab pesquisa candidatos Scholar pelo nome e pede
+uma confirmação simples das três áreas. O selo `INSTITUCIONAL` usa exclusivamente
+o claim confiável `hd` do Google Workspace; o domínio textual do e-mail não é
+usado como prova. Para habilitar o selo ORCID, registre um cliente OAuth público e
+configure `ORCID_CLIENT_ID`, `ORCID_CLIENT_SECRET` e a URL de retorno indicada no
+`.env-example`. O vínculo usa OAuth com `state` anti-CSRF e não armazena a senha ORCID.
+
+Se já existir volume PostgreSQL antigo, o `schema.sql` do backend aplica as
+novas tabelas e colunas na inicialização, mas a imagem do serviço de banco deve
+ser atualizada para `pgvector/pgvector:pg16` para disponibilizar a extensão.
+Usuários antigos devem completar três áreas no perfil para receber
+recomendações.
+
 To reset
 ```bash
 docker compose down -v
