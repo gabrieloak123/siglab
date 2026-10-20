@@ -62,13 +62,18 @@ public class VectorRepository {
             """, (rs, row) -> new Suggestion(rs.getString("type"), rs.getString("id")),
                 userId, userId, userId, userId, userId, userId);
     }
-    public List<Long> suggestedPosts(Long userId, boolean followedOnly) {
+    public List<Long> suggestedPosts(Long userId, boolean followedOnly, double maxFollowedDistance) {
+        if (maxFollowedDistance < 0 || maxFollowedDistance > 2)
+            throw new IllegalArgumentException("Distância máxima deve estar entre 0 e 2.");
         return jdbc.queryForList("""
             SELECT p.id FROM posts p JOIN post_vectors v ON v.post_id=p.id
             JOIN user_vectors mine ON mine.user_id=?
-            WHERE (? = false OR EXISTS(SELECT 1 FROM researcher_follows f WHERE f.follower_id=? AND f.followed_id=p.publisher_user_id)
+            WHERE ? = false OR (
+              (EXISTS(SELECT 1 FROM researcher_follows f WHERE f.follower_id=? AND f.followed_id=p.publisher_user_id)
                OR EXISTS(SELECT 1 FROM group_follows f WHERE f.follower_id=? AND f.group_id=p.group_id))
+              AND (v.embedding <=> mine.embedding) <= ?
+            )
             ORDER BY v.embedding <=> mine.embedding, p.created_at DESC, p.id DESC
-            """, Long.class, userId, followedOnly, userId, userId);
+            """, Long.class, userId, followedOnly, userId, userId, maxFollowedDistance);
     }
 }

@@ -3,6 +3,7 @@ package br.ufrn.dimap.siglab.service;
 import br.ufrn.dimap.siglab.integration.EmbeddingClient;
 import br.ufrn.dimap.siglab.integration.ScholarClient;
 import br.ufrn.dimap.siglab.model.User;
+import br.ufrn.dimap.siglab.model.Post;
 import br.ufrn.dimap.siglab.repository.VectorRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,5 +41,14 @@ class InterestServiceTest {
         assertArrayEquals(new String[]{"IA", "Robótica", "Visão"},
                 service.withScholar("author", new String[]{"Visão"}));
         assertThrows(IllegalArgumentException.class, () -> service.withScholar("author", new String[0]));
+    }
+
+    @Test void indexesArticleUsingKeywordsAndAbstract() {
+        float[] vector = new float[1024];
+        Post post = Post.builder().id(9L).keywords(new String[]{"IA", "Saúde"})
+                .description("Diagnóstico por imagens médicas").content("Texto completo").build();
+        when(embeddings.embed("IA, Saúde\nDiagnóstico por imagens médicas")).thenReturn(vector);
+        service.indexPost(post);
+        verify(vectors).post(9L, vector);
     }
 }

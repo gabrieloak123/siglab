@@ -6,6 +6,7 @@ import br.ufrn.dimap.siglab.service.UserService;
 import br.ufrn.dimap.siglab.service.SessionUser;
 import br.ufrn.dimap.siglab.service.AuthService;
 import br.ufrn.dimap.siglab.dto.RegistrationRequest;
+import br.ufrn.dimap.siglab.dto.UpdateUserRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -54,7 +55,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User userDetails, HttpServletRequest request) {
+    public ResponseEntity<User> updateUser(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest userDetails, HttpServletRequest request) {
         if (!sessionUser.require(request).getId().equals(id)) throw new SecurityException("Só é possível editar o próprio perfil.");
         User updatedUser = userService.update(id, userDetails);
         return ResponseEntity.ok(updatedUser);

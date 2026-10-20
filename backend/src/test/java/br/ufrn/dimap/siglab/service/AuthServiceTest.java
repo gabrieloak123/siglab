@@ -49,7 +49,7 @@ class AuthServiceTest {
         assertArrayEquals(manual, created.getInterest_areas());
     }
     @Test void rejectsWrongPassword() {
-        when(users.findByEmail("a@b.com")).thenReturn(Optional.of(User.builder().email("a@b.com").password("hash").build()));
+        when(users.findByEmailIgnoreCase("a@b.com")).thenReturn(Optional.of(User.builder().email("a@b.com").password("hash").build()));
         when(encoder.matches("wrong", "hash")).thenReturn(false);
         assertThrows(SecurityException.class, () -> service.login("a@b.com", "wrong"));
     }

@@ -11,15 +11,18 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class KeywordClient {
+public class KeywordClient implements KeywordExtractor {
     private final String apiKey;
-    private final RestClient client = RestClient.create();
-    public KeywordClient(@Value("${GEMINI_API_KEY:}") String apiKey) { this.apiKey = apiKey; }
+    private final RestClient client;
+    private final String modelUrl;
+    public KeywordClient(@Value("${GEMINI_API_KEY:}") String apiKey,
+                         @Value("${GEMINI_MODEL_URL:https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent}") String modelUrl,
+                         RestClient client) { this.apiKey = apiKey; this.modelUrl = modelUrl; this.client = client; }
 
     public String[] keywords(String content) {
         if (apiKey.isBlank()) throw new ExternalServiceException("Configure GEMINI_API_KEY para classificar posts do tipo Outros.");
         try {
-            Map<?, ?> response = client.post().uri("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent")
+            Map<?, ?> response = client.post().uri(modelUrl)
                     .header("x-goog-api-key", apiKey).contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("contents", List.of(Map.of("parts", List.of(Map.of("text",
                             "Leia todo o post e responda apenas com três palavras-chave distintas, separadas por vírgulas.\n" + content))))))

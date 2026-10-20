@@ -11,11 +11,14 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class ScholarClient {
+public class ScholarClient implements ResearchProfileProvider {
     private final String apiKey;
-    private final RestClient client = RestClient.create();
+    private final RestClient client;
+    private final String searchUrl;
 
-    public ScholarClient(@Value("${SERPAPI_KEY:}") String apiKey) { this.apiKey = apiKey; }
+    public ScholarClient(@Value("${SERPAPI_KEY:}") String apiKey,
+                         @Value("${SERPAPI_SEARCH_URL:https://serpapi.com/search.json}") String searchUrl,
+                         RestClient client) { this.apiKey = apiKey; this.searchUrl = searchUrl; this.client = client; }
 
     public List<String> interests(String authorId) {
         return profile(authorId).interests();
@@ -23,7 +26,7 @@ public class ScholarClient {
     public ScholarCandidate profile(String authorId) {
         if (apiKey.isBlank()) throw new ExternalServiceException("Configure SERPAPI_KEY para consultar o Google Scholar.");
         try {
-            String uri = UriComponentsBuilder.fromUriString("https://serpapi.com/search.json")
+            String uri = UriComponentsBuilder.fromUriString(searchUrl)
                     .queryParam("engine", "google_scholar_author")
                     .queryParam("author_id", authorId).queryParam("api_key", apiKey).build().toUriString();
             Map<?, ?> response = client.get().uri(uri).retrieve().body(Map.class);
@@ -39,7 +42,7 @@ public class ScholarClient {
     public List<ScholarCandidate> searchProfiles(String name) {
         if (apiKey.isBlank()) throw new ExternalServiceException("Configure SERPAPI_KEY para pesquisar perfis Google Scholar.");
         try {
-            String uri=UriComponentsBuilder.fromUriString("https://serpapi.com/search.json")
+            String uri=UriComponentsBuilder.fromUriString(searchUrl)
                     .queryParam("engine", "google_scholar_profiles").queryParam("mauthors", name)
                     .queryParam("api_key", apiKey).build().toUriString();
             Map<?,?> response=client.get().uri(uri).retrieve().body(Map.class);

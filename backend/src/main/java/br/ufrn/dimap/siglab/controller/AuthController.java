@@ -1,8 +1,8 @@
 package br.ufrn.dimap.siglab.controller;
 
 import br.ufrn.dimap.siglab.dto.*;
-import br.ufrn.dimap.siglab.integration.ScholarClient;
-import br.ufrn.dimap.siglab.integration.OrcidClient;
+import br.ufrn.dimap.siglab.service.InterestService;
+import br.ufrn.dimap.siglab.service.OrcidService;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.repository.UserRepository;
 import br.ufrn.dimap.siglab.service.AuthService;
@@ -21,13 +21,13 @@ import java.util.List;
 public class AuthController {
     private final AuthService auth;
     private final UserRepository users;
-    private final ScholarClient scholar;
+    private final InterestService interests;
     private final SessionUser sessionUser;
-    private final OrcidClient orcid;
+    private final OrcidService orcid;
     private final String appBaseUrl;
-    public AuthController(AuthService auth, UserRepository users, ScholarClient scholar, SessionUser sessionUser,
-                          OrcidClient orcid, @Value("${APP_BASE_URL:http://localhost:3000}") String appBaseUrl) {
-        this.auth=auth; this.users=users; this.scholar=scholar; this.sessionUser=sessionUser; this.orcid=orcid; this.appBaseUrl=appBaseUrl;
+    public AuthController(AuthService auth, UserRepository users, InterestService interests, SessionUser sessionUser,
+                          OrcidService orcid, @Value("${APP_BASE_URL:http://localhost:3000}") String appBaseUrl) {
+        this.auth=auth; this.users=users; this.interests=interests; this.sessionUser=sessionUser; this.orcid=orcid; this.appBaseUrl=appBaseUrl;
     }
     private User session(HttpServletRequest request, User user) {
         HttpSession old = request.getSession(false);
@@ -69,11 +69,11 @@ public class AuthController {
     @GetMapping("/me")
     public User me(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
-        if (session == null || !(session.getAttribute("userId") instanceof Long id)) throw new SecurityException("Entre para continuar.");
-        return users.findById(id).orElseThrow(() -> new SecurityException("Sessão inválida."));
+        if (session == null || !(session.getAttribute("userId") instanceof Long id)) throw new br.ufrn.dimap.siglab.exception.AuthenticationRequiredException("Entre para continuar.");
+        return users.findById(id).orElseThrow(() -> new br.ufrn.dimap.siglab.exception.AuthenticationRequiredException("Sessão inválida."));
     }
     @GetMapping("/scholar/{authorId}")
-    public List<String> scholar(@PathVariable String authorId) { return scholar.interests(authorId); }
+    public List<String> scholar(@PathVariable String authorId) { return interests.scholarInterests(authorId); }
     @GetMapping("/orcid/status")
     public java.util.Map<String,Boolean> orcidStatus() { return java.util.Map.of("configured", orcid != null && orcid.configured()); }
     @GetMapping("/orcid/start")
@@ -90,10 +90,7 @@ public class AuthController {
         if (!(expected instanceof String value) || !java.security.MessageDigest.isEqual(value.getBytes(), state.getBytes()))
             throw new SecurityException("Estado OAuth do ORCID inválido.");
         User user=sessionUser.require(request);
-        var identity=orcid.exchange(code);
-        if (users.existsByOrcid(identity.orcid()) && !identity.orcid().equals(user.getOrcid()))
-            throw new IllegalArgumentException("ORCID já vinculado a outra conta.");
-        user.setOrcid(identity.orcid()); user.setVerificationLevel("ORCID"); users.save(user);
+        orcid.link(user.getId(), code);
         return new RedirectView(appBaseUrl + "/?orcid=linked");
     }
 }

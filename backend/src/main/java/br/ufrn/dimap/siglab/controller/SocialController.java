@@ -27,6 +27,8 @@ public class SocialController {
     public List<Post> feed(HttpServletRequest req, @RequestParam(defaultValue="false") boolean followedOnly) {
         return social.feed(me(req), followedOnly);
     }
+    @GetMapping("/recent-posts")
+    public List<Post> recentPosts() { return social.recentPosts(); }
     @GetMapping("/following")
     public Map<String,Object> following(HttpServletRequest req) {
         Long id=me(req);

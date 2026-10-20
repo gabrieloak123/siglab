@@ -37,3 +37,14 @@ CREATE TABLE IF NOT EXISTS post_vectors (
   post_id BIGINT PRIMARY KEY REFERENCES posts(id) ON DELETE CASCADE,
   embedding vector(1024) NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS indexing_jobs (
+  entity_type VARCHAR(10) NOT NULL,
+  entity_id VARCHAR(255) NOT NULL,
+  version BIGINT NOT NULL DEFAULT 1,
+  status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+  attempts INTEGER NOT NULL DEFAULT 0,
+  available_at TIMESTAMP NOT NULL DEFAULT now(),
+  lease_until TIMESTAMP,
+  PRIMARY KEY (entity_type, entity_id)
+);
