@@ -18,8 +18,9 @@ no PostgreSQL com pgvector. Posts do tipo Outros recebem três palavras-chave
 do [`gemini-3.5-flash-lite`](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite);
 artigos usam as palavras-chave informadas pelo autor. O feed em `/posts` ordena
 por similaridade e depois por data; o painel inicial recomenda os três perfis
-ou grupos mais semelhantes ainda não seguidos. Dados anteriores são indexados
-quando a rede ou o feed são acessados pela primeira vez.
+ou grupos mais semelhantes ainda não seguidos. A indexação ocorre em uma fila
+persistida em segundo plano; até seu processamento, novos dados ou alterações
+podem não aparecer nas recomendações.
 
 O botão de entrada com Google usa [Google Identity](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
 No primeiro acesso, o usuário deve informar exatamente três áreas de interesse;
@@ -48,6 +49,34 @@ To reset
 ```bash
 docker compose down -v
 ```
+
+### Dados de demonstração
+
+Para substituir os dados atuais por 20 usuários, 5 grupos e 10 artigos de teste:
+
+```bash
+docker compose exec -T db psql -v ON_ERROR_STOP=1 -U siglab -d siglab < scripts/seed-test-data.sql
+```
+
+Todos os usuários de demonstração usam a senha `teste123`. O script também cria
+seguimentos, mas não fabrica vetores. O processo periódico identifica registros
+sem vetor e gera os embeddings pela Cloudflare com o mesmo modelo dos cadastros.
+A primeira indexação consome cota da API, mas mantém todos os registros no mesmo
+espaço semântico. Artigos são indexados pelas palavras-chave junto do resumo (ou
+conteúdo, quando não há resumo). O feed de entidades seguidas usa o limite de
+distância configurável `RECOMMENDATION_MAX_DISTANCE` (padrão `0.65`).
+
+Falhas na indexação são repetidas com espera progressiva até cinco tentativas e
+registradas nos logs do backend. Depois de corrigir as credenciais ou a causa da
+falha, trabalhos em estado `ERROR` podem ser reenfileirados com:
+
+```bash
+docker compose exec -T db psql -U siglab -d siglab -c "UPDATE indexing_jobs SET status='PENDING', attempts=0, available_at=now(), lease_until=NULL WHERE status='ERROR';"
+```
+
+Os limites de conexão e leitura dos clientes HTTP externos podem ser configurados
+em milissegundos com `EXTERNAL_CONNECT_TIMEOUT_MS` e `EXTERNAL_READ_TIMEOUT_MS`
+(padrões: 5000 e 20000). O serviço precisa ser reiniciado após alterar o `.env`.
 
 ## Front
 

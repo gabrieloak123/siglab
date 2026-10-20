@@ -38,12 +38,15 @@ services:
       CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      EXTERNAL_CONNECT_TIMEOUT_MS: ${EXTERNAL_CONNECT_TIMEOUT_MS:-5000}
+      EXTERNAL_READ_TIMEOUT_MS: ${EXTERNAL_READ_TIMEOUT_MS:-20000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       ORCID_CLIENT_ID: ${ORCID_CLIENT_ID:-}
       ORCID_CLIENT_SECRET: ${ORCID_CLIENT_SECRET:-}
       ORCID_REDIRECT_URI: ${ORCID_REDIRECT_URI:-http://localhost:3000/backend-api/api/auth/orcid/callback}
       ORCID_BASE_URL: ${ORCID_BASE_URL:-https://orcid.org}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      RECOMMENDATION_MAX_DISTANCE: ${RECOMMENDATION_MAX_DISTANCE:-0.65}
     depends_on:
       db:
         condition: service_healthy
@@ -54,7 +57,7 @@ services:
     volumes:
       - ./frontend:/app:z
       - /app/node_modules
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "npm install && npm run build && npm start"
     ports:
       - "3000:3000"
     environment:
