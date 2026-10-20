@@ -49,7 +49,7 @@ export default function NetworkPostsPage() {
         catch (caught) { setError(messageOf(caught, { api: "Não foi possível publicar o post.", network: "Falha de conexão." })); return false; }
       }} />
     </div>}
-    <label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={followedOnly} onChange={event => setFollowedOnly(event.target.checked)} /> Só publicações de pesquisadores ou grupos que sigo</label>
+    <label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={followedOnly} onChange={event => setFollowedOnly(event.target.checked)} /> Recomendações relevantes de pesquisadores ou grupos que sigo</label>
     <AlertBanner message={error} variant="error" /><AlertBanner message={notice} variant="success" />
     {posts.length === 0 && !error && <p className="text-gray-500 text-sm">Nenhum post encontrado.</p>}
     {posts.map(post => <article key={post.id} className="bg-white border rounded p-5 space-y-2">

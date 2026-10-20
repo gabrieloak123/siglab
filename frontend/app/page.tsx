@@ -8,6 +8,7 @@ import { AppFooter } from "@/components/layout/AppFooter";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AuthModal } from "@/components/modals/AuthModal";
 import { ProfileModal } from "@/components/modals/ProfileModal";
+import { RecentPosts } from "@/components/posts/RecentPosts";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { useAuth, type ProfilePayload } from "@/hooks/useAuth";
 import { useFeedback } from "@/hooks/useFeedback";
@@ -39,7 +40,9 @@ export default function Home() {
         <div className="bg-amber-50 border border-amber-300 rounded p-4 mb-6 text-sm">
           Complete três áreas de interesse em <button className="font-bold underline" onClick={() => void openProfile()}>Gerenciar Perfil</button> para receber sugestões.
         </div>}
-      {auth.user ? <><Dashboard groups={groups} feedback={feedback} /><SocialPanel /></> : <PublicGroupsSection groups={groups.allGroups} />}
+      {auth.user
+        ? <><Dashboard groups={groups} feedback={feedback} /><SocialPanel /></>
+        : <><RecentPosts /><PublicGroupsSection groups={groups.allGroups} /></>}
     </main>
     <AuthModal open={authOpen} feedback={feedback} onClose={() => setAuthOpen(false)}
       onLogin={async (email, password) => { const ok = await auth.login(email, password); if (ok) setAuthOpen(false); return ok; }}

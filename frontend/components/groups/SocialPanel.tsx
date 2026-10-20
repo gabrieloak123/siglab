@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { groupsApi, messageOf, socialApi, usersApi } from "@/lib/api";
+import { readStoredUser } from "@/lib/storage";
 import type { ResearchGroup, User } from "@/types";
 
 export function SocialPanel() {
+  const currentUser = typeof window === "undefined" ? null : readStoredUser();
   const [researchers, setResearchers] = useState<User[]>([]);
   const [groups, setGroups] = useState<ResearchGroup[]>([]);
   const [following, setFollowing] = useState<{ researchers: number[]; groups: string[] }>({ researchers: [], groups: [] });
@@ -41,8 +43,10 @@ export function SocialPanel() {
       await load();
     } catch (caught) { setError(messageOf(caught, { api: "Não foi possível alterar o seguimento.", network: "Falha de conexão." })); }
   };
-  const matchingResearchers = allResearchers.filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
+  const matchingResearchers = allResearchers.filter(item => item.id !== currentUser?.id && item.name.toLowerCase().includes(query.toLowerCase()));
   const matchingGroups = allGroups.filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
+  const followedResearchers = allResearchers.filter(item => item.id !== undefined && following.researchers.includes(item.id));
+  const followedGroups = allGroups.filter(item => following.groups.includes(item.group_id));
   return <section className="space-y-4 mt-8">
     <div className="flex items-center justify-between gap-4">
       <div><h2 className="text-xl font-bold">Sua rede de pesquisa</h2><p className="text-sm text-gray-600">Os três perfis e grupos mais próximos dos seus interesses.</p></div>
@@ -52,6 +56,16 @@ export function SocialPanel() {
       </div>
     </div>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+    <div className="grid md:grid-cols-2 gap-4">
+      <div className="bg-white p-5 rounded border border-gray-300"><h3 className="font-bold mb-3">Pesquisadores que eu sigo</h3>
+        {followedResearchers.length === 0 && <p className="text-sm text-gray-500">Você ainda não segue pesquisadores.</p>}
+        {followedResearchers.map(item => <div key={item.id} className="flex items-center justify-between gap-3 py-2 border-t border-gray-100"><div><p className="font-medium">{item.name}</p><p className="text-xs text-gray-500">{item.interest_areas?.join(", ")}</p></div><button onClick={() => void toggleResearcher(item.id!)} className="text-red-700 text-xs font-semibold">Deixar de seguir</button></div>)}
+      </div>
+      <div className="bg-white p-5 rounded border border-gray-300"><h3 className="font-bold mb-3">Grupos que eu sigo</h3>
+        {followedGroups.length === 0 && <p className="text-sm text-gray-500">Você ainda não segue grupos.</p>}
+        {followedGroups.map(item => <div key={item.group_id} className="flex items-center justify-between gap-3 py-2 border-t border-gray-100"><div><Link href={`/groups/${encodeURIComponent(item.group_id)}`} className="font-medium text-green-700 hover:underline">{item.name}</Link><p className="text-xs text-gray-500">{item.research_fields?.join(", ")}</p></div><button onClick={() => void toggleGroup(item.group_id)} className="text-red-700 text-xs font-semibold">Deixar de seguir</button></div>)}
+      </div>
+    </div>
     <div className="grid md:grid-cols-2 gap-4">
       <div className="bg-white p-5 rounded border border-gray-300"><h3 className="font-bold mb-3">Pesquisadores sugeridos</h3>
         {researchers.length === 0 && <p className="text-sm text-gray-500">Nenhuma sugestão disponível.</p>}

@@ -45,6 +45,7 @@ export const authApi = {
   logout: () => request<void>("/api/auth/logout", { method: "POST" }),
 };
 export const socialApi = {
+  recentPosts: () => request<Post[]>("/api/social/recent-posts"),
   researchers: () => request<User[]>("/api/social/suggestions/researchers"),
   groups: () => request<ResearchGroup[]>("/api/social/suggestions/groups"),
   feed: (followedOnly = false) => request<Post[]>(`/api/social/feed?followedOnly=${followedOnly}`),
@@ -66,7 +67,7 @@ export const groupsApi = {
   join: (token: string, email: string) => request<GroupMember>("/api/research-groups/join", { method: "POST", ...jsonBody({ inviteToken: token, userEmail: email }) }),
   setLeader: (id: string, email: string, leader: boolean) => request<GroupMember>(`${groupPath(id)}/members/${encodeURIComponent(email)}/leader?isLeader=${leader}`, { method: "PUT" }),
 };
-export interface CreateTaskPayload { id_criado_por: number; id_atribuido_a: number | null; id_coluna: number; titulo: string; descricao: string | null; tags: string[] }
+export interface CreateTaskPayload { id_atribuido_a: number | null; id_coluna: number; titulo: string; descricao: string | null; tags: string[] }
 export interface UpdateTaskPayload { id_atribuido_a: number | null; titulo: string; descricao: string | null; tags: string[] }
 export const kanbanApi = {
   board: (id: string) => request<KanbanBoard>(`${groupPath(id)}/board`),

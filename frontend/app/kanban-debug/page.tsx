@@ -6,10 +6,10 @@ import styles from "./page.module.css";
 type Task = { id:number; id_criado_por:number; id_atribuido_a:number|null; titulo:string; descricao:string|null; tags:string[]|null; id_coluna:number };
 type Column = { id:number; nome:string; ordem:number; tarefas:Task[] };
 type Board = { id:string; id_grupo_pesquisa:string; colunas:Column[] };
-type Draft = { titulo:string; descricao:string; id_criado_por:string; id_atribuido_a:string; id_coluna:string; tags:string };
+type Draft = { titulo:string; descricao:string; id_atribuido_a:string; id_coluna:string; tags:string };
 
 const API = "/backend-api";
-const emptyDraft: Draft = { titulo:"", descricao:"", id_criado_por:"", id_atribuido_a:"", id_coluna:"", tags:"" };
+const emptyDraft: Draft = { titulo:"", descricao:"", id_atribuido_a:"", id_coluna:"", tags:"" };
 
 async function request<T>(path:string, init?:RequestInit):Promise<T> {
   const response = await fetch(`${API}${path}`, init);
@@ -93,7 +93,7 @@ export default function KanbanDebug() {
   async function create(event:FormEvent) {
     event.preventDefault(); setCreating(true); setError("");
     try {
-      await request(`/api/research-groups/${encodeURIComponent(group)}/tasks`,json("POST",{titulo:draft.titulo,descricao:draft.descricao||null,id_criado_por:Number(draft.id_criado_por),id_atribuido_a:draft.id_atribuido_a?Number(draft.id_atribuido_a):null,id_coluna:Number(draft.id_coluna),tags:tagsOf(draft.tags)}));
+      await request(`/api/research-groups/${encodeURIComponent(group)}/tasks`,json("POST",{titulo:draft.titulo,descricao:draft.descricao||null,id_atribuido_a:draft.id_atribuido_a?Number(draft.id_atribuido_a):null,id_coluna:Number(draft.id_coluna),tags:tagsOf(draft.tags)}));
       setDraft(emptyDraft); setShowCreate(false); await load();
     } catch(e){setError(e instanceof Error?e.message:"Falha ao criar")}
     finally{setCreating(false)}
@@ -107,7 +107,6 @@ export default function KanbanDebug() {
     {board&&showCreate&&<form className={styles.create} onSubmit={create}><div className={styles.createTitle}><div><span className={styles.kicker}>POST /tasks</span><h2>Criar tarefa</h2></div><code>grupo: {group}</code></div><div className={styles.grid}>
       <label>Título<input required value={draft.titulo} onChange={e=>setDraft({...draft,titulo:e.target.value})}/></label>
       <label>Coluna<select required value={draft.id_coluna} onChange={e=>setDraft({...draft,id_coluna:e.target.value})}><option value="">Selecione</option>{board.colunas.map(c=><option key={c.id} value={c.id}>{c.nome} (#{c.id})</option>)}</select></label>
-      <label>ID do criador<input required min="1" type="number" value={draft.id_criado_por} onChange={e=>setDraft({...draft,id_criado_por:e.target.value})}/></label>
       <label>ID do responsável<input min="1" type="number" value={draft.id_atribuido_a} onChange={e=>setDraft({...draft,id_atribuido_a:e.target.value})}/></label>
       <label className={styles.wide}>Descrição<textarea value={draft.descricao} onChange={e=>setDraft({...draft,descricao:e.target.value})}/></label>
       <label className={styles.wide}>Tags, separadas por vírgula<input value={draft.tags} onChange={e=>setDraft({...draft,tags:e.target.value})}/></label>

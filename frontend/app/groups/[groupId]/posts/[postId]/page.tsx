@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { GroupAreaHeader } from "@/components/groups/GroupAreaHeader";
+import { GroupNavigation } from "@/components/groups/GroupNavigation";
 import { MarkdownContent } from "@/components/posts/MarkdownContent";
 import { PostEditor } from "@/components/posts/PostEditor";
 import { AlertBanner } from "@/components/ui/AlertBanner";
@@ -128,23 +129,14 @@ export default function PostDetailPage() {
 
   return (
     <main className="flex-1 max-w-4xl w-full mx-auto p-6">
+      <Link href="/posts" className="inline-block mb-4 text-sm text-green-700 font-semibold hover:underline">
+        ← Voltar para todos os posts
+      </Link>
+
       {area.group && (
         <GroupAreaHeader group={area.group} isLeader={area.isLeader} />
       )}
-
-      <nav className="flex gap-2 mb-6">
-        <Link href={basePath} className="btn-dark text-xs">
-          Quadro
-        </Link>
-        <Link href={`${basePath}/posts`} className="btn-dark text-xs">
-          Posts
-        </Link>
-        {area.isLeader && (
-          <Link href={`${basePath}/settings`} className="btn-dark text-xs">
-            Configurações
-          </Link>
-        )}
-      </nav>
+      <GroupNavigation groupId={groupId} active="posts" isLeader={area.isLeader} />
 
       <AlertBanner message={feedback.error} variant="error" />
       <AlertBanner message={feedback.success} variant="success" />
