@@ -67,9 +67,9 @@ export function ProfileModal({
       <AlertBanner message={feedback.error} variant="error" size="sm" />
 
       <form onSubmit={handleSubmit} className="space-y-4 mb-6">
-        <FormField label="Google Scholar author_id (opcional)">
+        {user.verificationLevel === "ORCID" && <FormField label="Google Scholar author_id (opcional)">
           <input type="text" value={authorId} onChange={(e) => setAuthorId(e.target.value)} className={inputClassName} />
-        </FormField>
+        </FormField>}
         <FormField label="Nome Completo">
           <input
             type="text"

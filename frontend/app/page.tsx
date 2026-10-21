@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dashboard } from "@/components/groups/Dashboard";
 import { PublicGroupsSection } from "@/components/groups/PublicGroupsSection";
 import { SocialPanel } from "@/components/groups/SocialPanel";
@@ -20,6 +20,16 @@ export default function Home() {
   const groups = useResearchGroups(auth.user, feedback);
   const [authOpen, setAuthOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  useEffect(() => {
+    if (window.self !== window.top) {
+      window.location.replace("/descobrir-interesses?embedded=1");
+      return;
+    }
+    if (new URLSearchParams(window.location.search).get("descoberta") !== "1") return;
+    window.history.replaceState(null, "", "/");
+    const timer = window.setTimeout(() => setAuthOpen(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   const openAuth = () => { feedback.clear(); setAuthOpen(true); };
   const openProfile = async () => { feedback.clear(); await auth.refreshUser(); setProfileOpen(true); };
   const updateProfile = async (payload: ProfilePayload) => {
@@ -36,6 +46,9 @@ export default function Home() {
     <main className="flex-1 max-w-5xl w-full mx-auto p-6 animate-fade">
       <AlertBanner message={feedback.error} variant="error" />
       <AlertBanner message={feedback.success} variant="success" />
+      {auth.user && auth.pendingDiscovery && <div className="mb-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm">
+        Sua seleção de publicações ainda não foi aplicada. <button className="font-bold underline" onClick={() => void auth.retryDiscovery()}>Tentar novamente</button> ou <a className="font-bold underline" href="/descobrir-interesses">refazer seleção</a>.
+      </div>}
       {auth.user && (auth.user.interest_areas?.length ?? 0) !== 3 &&
         <div className="bg-amber-50 border border-amber-300 rounded p-4 mb-6 text-sm">
           Complete três áreas de interesse em <button className="font-bold underline" onClick={() => void openProfile()}>Gerenciar Perfil</button> para receber sugestões.
@@ -44,10 +57,10 @@ export default function Home() {
         ? <><Dashboard groups={groups} feedback={feedback} /><SocialPanel /></>
         : <><RecentPosts /><PublicGroupsSection groups={groups.allGroups} /></>}
     </main>
-    <AuthModal open={authOpen} feedback={feedback} onClose={() => setAuthOpen(false)}
+    {authOpen && <AuthModal open={authOpen} feedback={feedback} onClose={() => setAuthOpen(false)}
       onLogin={async (email, password) => { const ok = await auth.login(email, password); if (ok) setAuthOpen(false); return ok; }}
       onRegister={async payload => { const ok = await auth.register(payload); if (ok) setAuthOpen(false); return ok; }}
-      onGoogle={async (credential, authorId, areas) => { const ok = await auth.googleLogin(credential, authorId, areas); if (ok) setAuthOpen(false); return ok; }} />
+      onGoogle={async (credential, areas) => { const ok = await auth.googleLogin(credential, areas); if (ok) setAuthOpen(false); return ok; }} />}
     {profileOpen && auth.user && <ProfileModal user={auth.user} feedback={feedback} onClose={() => setProfileOpen(false)} onUpdateProfile={updateProfile} onDeleteProfile={deleteProfile} />}
     <AppFooter />
   </div>;

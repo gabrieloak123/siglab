@@ -36,11 +36,10 @@ export const usersApi = {
 export const authApi = {
   me: () => request<User>("/api/auth/me"),
   login: (email: string, password: string) => request<User>("/api/auth/login", { method: "POST", ...jsonBody({ email, password }) }),
-  register: (payload: { name: string; email: string; password: string; authorId: string; interestAreas: string[] }) => request<User>("/api/auth/register", { method: "POST", ...jsonBody(payload) }),
-  google: (credential: string, authorId: string, interestAreas: string[]) => request<User>("/api/auth/google", { method: "POST", ...jsonBody({ credential, authorId, interestAreas }) }),
+  register: (payload: { name: string; email: string; password: string; interestAreas: string[] }) => request<User>("/api/auth/register", { method: "POST", ...jsonBody(payload) }),
+  google: (credential: string, interestAreas: string[]) => request<User>("/api/auth/google", { method: "POST", ...jsonBody({ credential, interestAreas }) }),
   googlePreview: (credential: string) => request<GooglePreview>("/api/auth/google/preview", { method: "POST", ...jsonBody({ credential }) }),
   linkGoogle: (credential: string) => request<User>("/api/auth/google/link", { method: "POST", ...jsonBody({ credential }) }),
-  scholar: (authorId: string) => request<string[]>(`/api/auth/scholar/${encodeURIComponent(authorId)}`),
   orcidStatus: () => request<{ configured: boolean }>("/api/auth/orcid/status"),
   logout: () => request<void>("/api/auth/logout", { method: "POST" }),
 };
@@ -49,11 +48,20 @@ export const socialApi = {
   researchers: () => request<User[]>("/api/social/suggestions/researchers"),
   groups: () => request<ResearchGroup[]>("/api/social/suggestions/groups"),
   feed: (followedOnly = false) => request<Post[]>(`/api/social/feed?followedOnly=${followedOnly}`),
-  following: () => request<{ researchers: number[]; groups: string[] }>("/api/social/following"),
-  followResearcher: (id: number) => request<void>(`/api/social/researchers/${id}/follow`, { method: "POST" }),
+  following: () => request<{ researchers: number[]; researcherFollows: ResearcherFollow[]; groups: string[] }>("/api/social/following"),
+  followResearcher: (id: number, interestAreas?: string[]) => request<void>(`/api/social/researchers/${id}/follow`, { method: "POST", ...jsonBody({ interestAreas: interestAreas ?? [] }) }),
   unfollowResearcher: (id: number) => request<void>(`/api/social/researchers/${id}/follow`, { method: "DELETE" }),
   followGroup: (id: string) => request<void>(`/api/social/groups/${encodeURIComponent(id)}/follow`, { method: "POST" }),
   unfollowGroup: (id: string) => request<void>(`/api/social/groups/${encodeURIComponent(id)}/follow`, { method: "DELETE" }),
+  postLike: (id: number) => request<{ liked: boolean; count: number }>(`/api/social/posts/${id}/like`),
+  likePost: (id: number) => request<{ liked: boolean; count: number }>(`/api/social/posts/${id}/like`, { method: "POST" }),
+  unlikePost: (id: number) => request<{ liked: boolean; count: number }>(`/api/social/posts/${id}/like`, { method: "DELETE" }),
+};
+export interface ResearcherFollow { researcherId: number; interestAreas: string[] }
+export interface DiscoveryPost { id: number; title: string; description: string | null; groupName: string; keywords: string[]; tags: string[]; indexed: boolean }
+export const discoveryApi = {
+  posts: (page: number) => request<{ posts: DiscoveryPost[]; hasMore: boolean }>(`/api/discovery/posts?page=${page}`),
+  save: (postIds: number[]) => request<void>("/api/discovery/selection", { method: "POST", ...jsonBody({ postIds }) }),
 };
 export type InviteTokenResponse = { inviteToken: string };
 const groupPath = (id: string) => `/api/research-groups/${encodeURIComponent(id)}`;
