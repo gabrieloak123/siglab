@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { ConferencePanel } from "@/components/groups/ConferencePanel";
+import { ConferenceSearch } from "@/components/groups/ConferenceSearch";
 import { Dashboard } from "@/components/groups/Dashboard";
 import { PublicGroupsSection } from "@/components/groups/PublicGroupsSection";
 import { SocialPanel } from "@/components/groups/SocialPanel";
@@ -39,7 +41,7 @@ export default function Home() {
         <div className="bg-amber-50 border border-amber-300 rounded p-4 mb-6 text-sm">
           Complete três áreas de interesse em <button className="font-bold underline" onClick={() => void openProfile()}>Gerenciar Perfil</button> para receber sugestões.
         </div>}
-      {auth.user ? <><Dashboard groups={groups} feedback={feedback} /><SocialPanel /></> : <PublicGroupsSection groups={groups.allGroups} />}
+      {auth.user ? <><Dashboard groups={groups} feedback={feedback} /><SocialPanel /><ConferencePanel /><ConferenceSearch /></> : <PublicGroupsSection groups={groups.allGroups} />}
     </main>
     <AuthModal open={authOpen} feedback={feedback} onClose={() => setAuthOpen(false)}
       onLogin={async (email, password) => { const ok = await auth.login(email, password); if (ok) setAuthOpen(false); return ok; }}

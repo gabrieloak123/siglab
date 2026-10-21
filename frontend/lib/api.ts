@@ -1,5 +1,5 @@
 import { isSameEmail } from "@/lib/utils";
-import type { GooglePreview, GroupMember, KanbanBoard, KanbanTask, Post, ResearchGroup, User } from "@/types";
+import type { ConferenceSuggestion, GooglePreview, GroupMember, KanbanBoard, KanbanTask, Post, ResearchGroup, User } from "@/types";
 
 const DEFAULT_API_URL = "/backend-api";
 export const getApiUrl = () => DEFAULT_API_URL;
@@ -47,6 +47,13 @@ export const authApi = {
 export const socialApi = {
   researchers: () => request<User[]>("/api/social/suggestions/researchers"),
   groups: () => request<ResearchGroup[]>("/api/social/suggestions/groups"),
+  conferences: () => request<ConferenceSuggestion[]>("/api/social/suggestions/conferences"),
+  conferenceCountries: () => request<string[]>("/api/social/conferences/countries"),
+  searchConferences: (params: { start: string; end: string; field: string; country?: string }) => {
+    const query = new URLSearchParams({ start: params.start, end: params.end, field: params.field });
+    if (params.country) query.set("country", params.country);
+    return request<ConferenceSuggestion[]>(`/api/social/conferences/search?${query.toString()}`);
+  },
   feed: (followedOnly = false) => request<Post[]>(`/api/social/feed?followedOnly=${followedOnly}`),
   following: () => request<{ researchers: number[]; groups: string[] }>("/api/social/following"),
   followResearcher: (id: number) => request<void>(`/api/social/researchers/${id}/follow`, { method: "POST" }),

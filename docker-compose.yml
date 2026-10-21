@@ -44,6 +44,9 @@ services:
       ORCID_REDIRECT_URI: ${ORCID_REDIRECT_URI:-http://localhost:3000/backend-api/api/auth/orcid/callback}
       ORCID_BASE_URL: ${ORCID_BASE_URL:-https://orcid.org}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      CONFERENCE_API_KEY: ${CONFERENCE_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
