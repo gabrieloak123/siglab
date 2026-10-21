@@ -10,9 +10,8 @@ docker compose up --build
 ## Sprint 3: rede e recomendações
 
 Copie `.env-example` para `.env` e configure `SERPAPI_KEY`, `CLOUDFLARE_ACCOUNT_ID`,
-`CLOUDFLARE_API_TOKEN`, `GEMINI_API_KEY` e `GOOGLE_CLIENT_ID`. O cadastro consulta
-o perfil público pelo `author_id` usando [SerpApi](https://serpapi.com/google-scholar-author-api),
-exige três áreas distintas e grava vetores de 1024 dimensões do
+`CLOUDFLARE_API_TOKEN`, `GEMINI_API_KEY` e `GOOGLE_CLIENT_ID`. O cadastro exige
+três áreas distintas e grava vetores de 1024 dimensões do
 [`@cf/baai/bge-m3`](https://developers.cloudflare.com/workers-ai/models/bge-m3/)
 no PostgreSQL com pgvector. Posts do tipo Outros recebem três palavras-chave
 do [`gemini-3.5-flash-lite`](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite);
@@ -23,8 +22,9 @@ persistida em segundo plano; até seu processamento, novos dados ou alterações
 podem não aparecer nas recomendações.
 
 O botão de entrada com Google usa [Google Identity](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
-No primeiro acesso, o usuário deve informar exatamente três áreas de interesse;
-o `author_id` é opcional e, quando informado, busca áreas no perfil público Scholar.
+No primeiro acesso, nome e e-mail são preenchidos pela identidade Google e o usuário
+deve confirmar exatamente três áreas de interesse. O fluxo Google não pesquisa
+perfis Scholar nem tenta deduzir `author_id` pelo e-mail.
 A API pública do Scholar não oferece autenticação do titular
 nem fornece `author_id` na credencial Google; portanto, o vínculo informado não
 prova a propriedade do perfil Scholar. Configure no Google Cloud um ID de cliente
@@ -32,8 +32,9 @@ OAuth para a origem do frontend (por exemplo `http://localhost:3000`).
 Quem já possui uma conta com senha pode vinculá-la ao Google em Gerenciar Perfil;
 o e-mail da credencial Google precisa coincidir com o da conta.
 
-No primeiro acesso Google, o SIGLab pesquisa candidatos Scholar pelo nome e pede
-uma confirmação simples das três áreas. O selo `INSTITUCIONAL` usa exclusivamente
+O `author_id` só pode ser preenchido em Gerenciar Perfil depois da autenticação
+ORCID. Essa autenticação autoriza o preenchimento, mas não comprova que o perfil
+Scholar indicado pertence à mesma pessoa. O selo `INSTITUCIONAL` usa exclusivamente
 o claim confiável `hd` do Google Workspace; o domínio textual do e-mail não é
 usado como prova. Para habilitar o selo ORCID, registre um cliente OAuth público e
 configure `ORCID_CLIENT_ID`, `ORCID_CLIENT_SECRET` e a URL de retorno indicada no
@@ -44,6 +45,19 @@ novas tabelas e colunas na inicialização, mas a imagem do serviço de banco de
 ser atualizada para `pgvector/pgvector:pg16` para disponibilizar a extensão.
 Usuários antigos devem completar três áreas no perfil para receber
 recomendações.
+
+### Descoberta de interesses por publicações
+
+Na janela de login ou cadastro, **Descobrir minhas áreas de interesse** abre
+uma lista paginada de publicações. Escolha até 30 posts indexados: suas
+palavras-chave sugerem até três áreas editáveis e, após a autenticação, a média
+normalizada dos vetores dos posts é salva separadamente do vetor das áreas
+declaradas. A busca combina os dois perfis com o mesmo peso quando ambos existem.
+As sugestões por palavras-chave são uma heurística, não uma conversão do vetor
+em texto; se faltarem áreas, complete-as manualmente. A seleção fica na aba do
+navegador até a aplicação à conta, e pode ser refeita. Posts ainda sem vetor não
+podem ser selecionados; aguarde a indexação. Se a aplicação falhar, uma opção
+de nova tentativa aparece após o login.
 
 To reset
 ```bash

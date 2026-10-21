@@ -64,7 +64,7 @@ DTO significa *Data Transfer Object*: um formato para entrada ou saída que pode
 | Classe | Uso |
 | --- | --- |
 | `RegistrationRequest`, `LoginRequest` | Dados para cadastro e autenticação por e-mail/senha. |
-| `GoogleLoginRequest`, `GooglePreviewResponse` | Credencial e dados complementares do login Google; resposta da prévia com dados da identidade e candidatos Scholar. |
+| `GoogleLoginRequest`, `GooglePreviewResponse` | Credencial e áreas do login Google; resposta da prévia com nome, e-mail e domínio da identidade validada. |
 | `ScholarCandidate` | Dados resumidos de perfil Scholar candidato, incluindo identificador, nome e informações públicas. |
 | `CreateGroupRequest`, `UpdateGroupRequest` | Nome e três linhas de pesquisa; criação também recebe `group_id`. |
 | `GroupMemberDTO` | Representação de membro, incluindo informações básicas e indicador de liderança. |
@@ -85,7 +85,7 @@ Controllers traduzem requisições HTTP em chamadas de serviços e definem rotas
 | --- | --- |
 | `POST /register` | Cadastra e estabelece sessão. |
 | `POST /login` | Autentica por e-mail e senha e estabelece sessão. |
-| `POST /google/preview` | Valida a credencial Google e apresenta dados e possíveis candidatos Scholar. |
+| `POST /google/preview` | Valida a credencial Google e apresenta nome, e-mail e domínio; não pesquisa Scholar. |
 | `POST /google` | Entra ou cria conta Google; no cadastro novo são necessárias áreas válidas. |
 | `POST /google/link` | Vincula Google a uma conta autenticada, sujeito à conferência de e-mail. |
 | `POST /logout`, `GET /me` | Encerra a sessão ou retorna o usuário autenticado. |
@@ -118,7 +118,7 @@ Fornece sugestões em `/suggestions/researchers` e `/suggestions/groups`, feed e
 
 | Classe | Responsabilidade conceitual |
 | --- | --- |
-| `AuthService` | Cadastro, login por senha, validação/entrada Google, prévia Scholar e vínculo de conta Google. Coordena provedores por interfaces e evita manter transações de domínio abertas durante chamadas externas. |
+| `AuthService` | Cadastro, login por senha, validação/entrada Google e vínculo de conta Google. A prévia usa somente a identidade Google e não procura perfis Scholar. |
 | `SessionUser` | Recupera e valida o usuário da sessão HTTP para os fluxos que a exigem. |
 | `UserService` | Persistência e alteração de perfil, tratamento de senha, verificação de duplicidades, validação de áreas, exclusão e enfileiramento de indexação. Impede exclusão de usuário quando deixaria grupo sem líder. |
 | `ResearchGroupService` | Cadastro e alteração de grupos, vínculos, liderança, convites e remoções. Usa bloqueio pessimista do grupo nas operações de liderança para ajudar a proteger a regra de ao menos um líder. |
@@ -129,6 +129,7 @@ Fornece sugestões em `/suggestions/researchers` e `/suggestions/groups`, feed e
 | `PostService` | Verifica acesso e liderança, valida tipo e palavras-chave, salva publicações e solicita indexação. `ARTIGO` exige palavras-chave informadas; `OUTROS` tem palavras-chave geradas posteriormente. |
 | `SocialService` | Gerencia seguimentos, consulta recomendações e feed, e retorna publicações recentes. |
 | `IndexingQueue` | Mantém trabalhos persistidos, descobre vetores ausentes, executa indexação em segundo plano e controla tentativas, versões e concessão temporária do trabalho. |
+| `DiscoveryService` | Valida os posts selecionados e salva, para o usuário autenticado, a média normalizada de seus vetores, separada do vetor de áreas declaradas. |
 
 Transações `@Transactional` agrupam alterações relacionadas no banco. Elas não devem ser confundidas com atomicidade entre o banco e APIs externas: o sistema usa fila persistida para separar a gravação principal da indexação externa.
 
@@ -150,7 +151,10 @@ Repositórios encapsulam acesso aos dados. Os repositórios de entidades usam Sp
 ### Tabelas complementares em `schema.sql`
 
 - `researcher_follows` e `group_follows`: relacionamentos de acompanhamento, com chaves compostas; o banco impede seguir a si próprio.
+- `post_likes`: curtidas idempotentes por usuário e publicação, removidas em cascata com a conta ou o post.
 - `user_vectors`, `group_vectors`, `post_vectors`: um vetor por entidade, com chave estrangeira e exclusão em cascata.
+- `user_discovery_vectors`: perfil derivado dos posts escolhidos pelo usuário, separado das áreas declaradas.
+- `user_like_vectors`: média normalizada dos posts curtidos pelo usuário; é recalculada ao curtir, descurtir ou reindexar um post.
 - `indexing_jobs`: chave por tipo e id da entidade, versão, estado, tentativas, disponibilidade e prazo de concessão ao processador.
 - Índices únicos adicionais protegem `author_id`, `google_subject` e `orcid` quando preenchidos.
 
@@ -173,10 +177,10 @@ As chamadas podem falhar por indisponibilidade, credenciais, limites de cota ou 
 ### Cadastro, autenticação e vínculo de identidade
 
 1. O controller recebe os dados e executa as validações declarativas aplicáveis.
-2. `AuthService` confere credenciais ou consulta o provedor Google. Se houver `authorId`, a consulta Scholar pode contribuir com as áreas; sem ele, o usuário informa as áreas.
+2. `AuthService` confere credenciais ou consulta o provedor Google. Nome e e-mail vêm da identidade Google, enquanto as três áreas são confirmadas pelo usuário.
 3. `UserService` valida os dados, armazena a senha com BCrypt e registra a necessidade de indexação na mesma transação da gravação.
 4. O controller estabelece uma sessão com `userId`; chamadas posteriores que a exigem consultam essa sessão.
-5. O usuário pode iniciar separadamente o OAuth ORCID. Na volta, `state` e sessão são conferidos, e `OrcidService` vincula a identidade retornada.
+5. O usuário pode iniciar separadamente o OAuth ORCID. Na volta, `state` e sessão são conferidos, e `OrcidService` vincula a identidade retornada. Só então a interface permite preencher `author_id`; esse requisito não prova a propriedade do perfil Scholar.
 
 ### Publicação e indexação
 
@@ -195,6 +199,10 @@ Os estados usados são `PENDING`, `PROCESSING` e `ERROR`. A captura usa bloqueio
 O texto de áreas ou de palavras-chave e resumo/conteúdo é transformado em vetor. O PostgreSQL compara vetores pela distância cosseno (`<=>`): distância menor indica maior proximidade nesse espaço. Usuário, grupo e post devem estar indexados para participar das comparações.
 
 As sugestões de pessoas e grupos excluem o próprio usuário, entidades já seguidas e grupos dos quais ele já é membro. A consulta combina os dois tipos e limita o conjunto total a três antes de separar os resultados por tipo; portanto, não há garantia de três resultados de cada categoria. O feed é ordenado por distância e, em seguida, por data; com `followedOnly=true`, considera publicações de autores ou grupos seguidos e aplica `RECOMMENDATION_MAX_DISTANCE`. Sem vetor do usuário ou das publicações, o resultado pode ficar vazio.
+
+Quando existe um perfil de descoberta, as buscas combinam os vetores normalizados das áreas declaradas e da seleção com pesos iguais; na ausência de um deles, usam o disponível. `DiscoveryController` fornece uma lista pública paginada de posts e recebe a seleção de até 30 posts indexados somente após autenticação. `DiscoverySelectionRequest` valida o formato. O frontend sugere até três áreas pela frequência das palavras-chave (ou tags quando faltam palavras-chave), que podem ser editadas; isso não é uma inversão do embedding. A seleção anterior ao login fica temporariamente na aba e é vinculada após autenticação.
+
+Curtidas alteram somente o perfil vetorial, nunca as três áreas textuais. Quando há um perfil-base (áreas declaradas e/ou seleção explícita), ele participa com peso efetivo de 80% e a média dos posts curtidos com 20%. Sem perfil-base, as curtidas formam todo o vetor disponível; sem curtidas, o comportamento anterior é preservado. A implementação realiza a ponderação por soma repetida de vetores normalizados, porque a versão atual do pgvector não oferece multiplicação escalar de vetores.
 
 ## 10. Exceções e respostas
 
