@@ -1,6 +1,7 @@
 package br.ufrn.dimap.siglab.service;
 
 import br.ufrn.dimap.siglab.dto.CreatePostRequestDTO;
+import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
 import br.ufrn.dimap.siglab.model.Post;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.model.User_ResearchGroup;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import java.util.List;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -47,5 +49,28 @@ class PostServiceTest {
         Post saved=service.criar("lab","leader@lab.org",request);
         assertEquals(0,saved.getKeywords().length);
         verify(indexing).enqueue("POST", "9");
+    }
+    @Test void anonymousVisitorCanListGroupPosts() {
+        when(groups.existsById("lab")).thenReturn(true);
+        when(posts.findByGroupIdOrderByCreatedAtDesc("lab")).thenReturn(List.of(Post.builder().id(1L).groupId("lab").title("Post").build()));
+        List<Post> found=service.listar("lab",null);
+        assertEquals(1,found.size());
+        verifyNoInteractions(users);
+    }
+    @Test void anonymousVisitorCanReadASingleGroupPost() {
+        when(groups.existsById("lab")).thenReturn(true);
+        when(posts.findByIdAndGroupId(3L,"lab")).thenReturn(Optional.of(Post.builder().id(3L).groupId("lab").title("Post").build()));
+        assertEquals(3L,service.buscar("lab",3L,null).getId());
+        verifyNoInteractions(users);
+    }
+    @Test void unknownEmailIsRejectedWhenListingPosts() {
+        when(groups.existsById("lab")).thenReturn(true);
+        when(users.existsByEmail("desconhecido@lab.org")).thenReturn(false);
+        assertThrows(SecurityException.class, () -> service.listar("lab","desconhecido@lab.org"));
+        verifyNoInteractions(posts);
+    }
+    @Test void missingGroupIsReportedToAnonymousVisitors() {
+        when(groups.existsById("lab")).thenReturn(false);
+        assertThrows(ResourceNotFoundException.class, () -> service.listar("lab",null));
     }
 }

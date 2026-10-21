@@ -30,12 +30,14 @@ public class PostService {
     }
     @Transactional(readOnly=true)
     public List<Post> listar(String groupId, String email) {
-        checkGroup(groupId); checkReader(email);
+        checkGroup(groupId);
+        if (email != null) checkReader(email);
         return posts.findByGroupIdOrderByCreatedAtDesc(groupId);
     }
     @Transactional(readOnly=true)
     public Post buscar(String groupId, Long id, String email) {
-        checkGroup(groupId); checkReader(email);
+        checkGroup(groupId);
+        if (email != null) checkReader(email);
         return post(groupId,id);
     }
     @Transactional

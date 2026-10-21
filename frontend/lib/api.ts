@@ -74,6 +74,7 @@ export type InviteTokenResponse = { inviteToken: string };
 const groupPath = (id: string) => `/api/research-groups/${encodeURIComponent(id)}`;
 export const groupsApi = {
   list: () => request<ResearchGroup[]>("/api/research-groups"),
+  get: (id: string) => request<ResearchGroup>(groupPath(id)),
   create: (payload: ResearchGroup) => request<ResearchGroup>("/api/research-groups", { method: "POST", ...jsonBody(payload) }),
   update: (id: string, payload: Omit<ResearchGroup, "group_id">) => request<ResearchGroup>(groupPath(id), { method: "PUT", ...jsonBody(payload) }),
   remove: (id: string, password: string, email: string) => request<void>(`${groupPath(id)}?leaderPassword=${encodeURIComponent(password)}`, { method: "DELETE", headers: { "X-Requester-Email": email } }),
@@ -93,9 +94,11 @@ export const kanbanApi = {
 };
 export interface PostPayload { title: string; description: string | null; content: string; tags: string[]; filePath: string | null; postType: "ARTIGO" | "OUTROS"; keywords: string[] }
 const requesterHeaders = (email: string) => ({ "X-Requester-Email": email });
+const optionalRequesterHeaders = (email?: string | null) =>
+  email ? requesterHeaders(email) : undefined;
 export const postsApi = {
-  list: (id: string, email: string) => request<Post[]>(`${groupPath(id)}/posts`, { headers: requesterHeaders(email) }),
-  get: (id: string, post: number, email: string) => request<Post>(`${groupPath(id)}/posts/${post}`, { headers: requesterHeaders(email) }),
+  list: (id: string, email?: string | null) => request<Post[]>(`${groupPath(id)}/posts`, { headers: optionalRequesterHeaders(email) }),
+  get: (id: string, post: number, email?: string | null) => request<Post>(`${groupPath(id)}/posts/${post}`, { headers: optionalRequesterHeaders(email) }),
   create: (id: string, email: string, payload: PostPayload) => request<Post>(`${groupPath(id)}/posts`, { method: "POST", ...jsonBody(payload, requesterHeaders(email)) }),
   update: (id: string, post: number, email: string, payload: PostPayload) => request<Post>(`${groupPath(id)}/posts/${post}`, { method: "PUT", ...jsonBody(payload, requesterHeaders(email)) }),
   remove: (id: string, post: number, email: string) => request<void>(`${groupPath(id)}/posts/${post}`, { method: "DELETE", headers: requesterHeaders(email) }),

@@ -3,6 +3,7 @@ package br.ufrn.dimap.siglab.controller;
 import br.ufrn.dimap.siglab.dto.CreatePostRequestDTO;
 import br.ufrn.dimap.siglab.dto.UpdatePostRequestDTO;
 import br.ufrn.dimap.siglab.model.Post;
+import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.service.PostService;
 import br.ufrn.dimap.siglab.service.SessionUser;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,11 +22,11 @@ public class PostController {
     }
     @GetMapping
     public List<Post> list(@PathVariable String groupId, HttpServletRequest request) {
-        return posts.listar(groupId, sessionUser.require(request).getEmail());
+        return posts.listar(groupId, sessionUser.find(request).map(User::getEmail).orElse(null));
     }
     @GetMapping("/{postId}")
     public Post get(@PathVariable String groupId, @PathVariable Long postId, HttpServletRequest request) {
-        return posts.buscar(groupId,postId,sessionUser.require(request).getEmail());
+        return posts.buscar(groupId,postId,sessionUser.find(request).map(User::getEmail).orElse(null));
     }
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

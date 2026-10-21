@@ -7,6 +7,7 @@ import type { Post } from "@/types";
 interface PostListProps {
   groupId: string;
   posts: Post[];
+  showLike?: boolean;
 }
 
 const formatDate = (value?: string | null) => {
@@ -18,7 +19,7 @@ const formatDate = (value?: string | null) => {
     : date.toLocaleDateString("pt-BR", { dateStyle: "long" });
 };
 
-export function PostList({ groupId, posts }: PostListProps) {
+export function PostList({ groupId, posts, showLike = true }: PostListProps) {
   if (posts.length === 0) {
     return (
       <p className="text-sm text-gray-500 italic">
@@ -63,7 +64,9 @@ export function PostList({ groupId, posts }: PostListProps) {
           {post.description && (
             <p className="text-sm text-[#333333]">{post.description}</p>
           )}
-          <div className="mt-3"><PostLikeButton postId={post.id} /></div>
+          {showLike && (
+            <div className="mt-3"><PostLikeButton postId={post.id} /></div>
+          )}
         </article>
       ))}
     </div>

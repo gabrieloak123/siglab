@@ -39,7 +39,7 @@ export default function PostDetailPage() {
   const requesterEmail = area.user?.email ?? null;
 
   const reload = useCallback(async () => {
-    if (!requesterEmail || Number.isNaN(postId)) {
+    if (Number.isNaN(postId)) {
       setPost(null);
       setLoading(false);
       return;
@@ -74,19 +74,6 @@ export default function PostDetailPage() {
     return (
       <main className="flex-1 max-w-4xl w-full mx-auto p-6">
         <p className="text-sm text-gray-600">Carregando post...</p>
-      </main>
-    );
-  }
-
-  if (!area.user) {
-    return (
-      <main className="flex-1 max-w-4xl w-full mx-auto p-6">
-        <h1 className="text-xl font-bold text-[#333333] mb-2">
-          Entre para acessar o post
-        </h1>
-        <p className="text-sm text-gray-600">
-          Sua sessão não foi encontrada. Faça login para ler este post.
-        </p>
       </main>
     );
   }
@@ -126,11 +113,20 @@ export default function PostDetailPage() {
     }
   };
 
+  const isAnonymous = !area.user;
+
   return (
     <main className="flex-1 max-w-4xl w-full mx-auto p-6">
-      <Link href="/posts" className="inline-block mb-4 text-sm text-green-700 font-semibold hover:underline">
-        ← Voltar para todos os posts
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <Link href={`${basePath}/posts`} className="text-sm text-green-700 font-semibold hover:underline">
+          ← Voltar para os posts do grupo
+        </Link>
+        {isAnonymous && (
+          <Link href="/?descoberta=1" className="btn-green text-sm">
+            Entrar / Cadastrar-se
+          </Link>
+        )}
+      </div>
 
       <AlertBanner message={feedback.error} variant="error" />
       <AlertBanner message={feedback.success} variant="success" />
@@ -214,7 +210,9 @@ export default function PostDetailPage() {
           )}
 
           <MarkdownContent content={post.content ?? ""} />
-          <div className="mt-6 border-t border-gray-200 pt-4"><PostLikeButton postId={post.id} /></div>
+          {!isAnonymous && (
+            <div className="mt-6 border-t border-gray-200 pt-4"><PostLikeButton postId={post.id} /></div>
+          )}
         </article>
       )}
     </main>

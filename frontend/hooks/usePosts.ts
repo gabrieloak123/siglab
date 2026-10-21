@@ -24,16 +24,12 @@ export const usePosts = (
   const [error, setError] = useState("");
 
   const reload = useCallback(async () => {
-    if (!requesterEmail) {
-      setPosts([]);
-      setLoading(false);
-      return;
-    }
-
     setError("");
     setLoading(true);
 
     try {
+      // A listagem é pública: visitantes anônimos também conseguem ler os
+      // posts do grupo. Apenas as mutações exigem um e-mail de requisitante.
       setPosts(await postsApi.list(groupId, requesterEmail));
     } catch (caught) {
       setError(
