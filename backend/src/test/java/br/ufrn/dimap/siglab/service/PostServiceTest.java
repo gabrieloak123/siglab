@@ -1,7 +1,6 @@
 package br.ufrn.dimap.siglab.service;
 
 import br.ufrn.dimap.siglab.dto.CreatePostRequestDTO;
-import br.ufrn.dimap.siglab.integration.KeywordClient;
 import br.ufrn.dimap.siglab.model.Post;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.model.User_ResearchGroup;
@@ -22,10 +21,10 @@ class PostServiceTest {
     @Mock ResearchGroupRepository groups;
     @Mock UserRepository users;
     @Mock User_ResearchGroupRepository memberships;
-    @Mock KeywordClient keywordClient;
-    @Mock InterestService interests;
+    @Mock IndexingQueue indexing;
+    @Mock PostLikeRepository likes;
     PostService service;
-    @BeforeEach void setup() { service=new PostService(posts,groups,users,memberships,keywordClient,interests); }
+    @BeforeEach void setup() { service=new PostService(posts,groups,users,memberships,indexing,likes); }
 
     private void leader() {
         when(groups.existsById("lab")).thenReturn(true);
@@ -38,17 +37,15 @@ class PostServiceTest {
         CreatePostRequestDTO request=new CreatePostRequestDTO();
         request.setPostType("ARTIGO"); request.setContent("Corpo");
         assertThrows(IllegalArgumentException.class, () -> service.criar("lab","leader@lab.org",request));
-        verifyNoInteractions(posts, keywordClient, interests);
+        verifyNoInteractions(posts, indexing);
     }
-    @Test void otherPostUsesGeneratedKeywordsAndIndexesThem() {
+    @Test void otherPostQueuesKeywordGenerationAndIndexing() {
         leader();
         CreatePostRequestDTO request=new CreatePostRequestDTO();
         request.setPostType("OUTROS"); request.setContent("Corpo"); request.setTitle("Título");
-        String[] terms={"IA","Robótica","Visão"};
-        when(keywordClient.keywords("Corpo")).thenReturn(terms);
         when(posts.save(any(Post.class))).thenAnswer(invocation -> { Post post=invocation.getArgument(0); post.setId(9L); return post; });
         Post saved=service.criar("lab","leader@lab.org",request);
-        assertArrayEquals(terms,saved.getKeywords());
-        verify(interests).indexPost(9L,terms);
+        assertEquals(0,saved.getKeywords().length);
+        verify(indexing).enqueue("POST", "9");
     }
 }

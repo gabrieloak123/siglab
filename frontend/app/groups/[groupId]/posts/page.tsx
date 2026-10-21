@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
 import { GroupAreaHeader } from "@/components/groups/GroupAreaHeader";
+import { GroupNavigation } from "@/components/groups/GroupNavigation";
 import { PostEditor } from "@/components/posts/PostEditor";
 import { PostList } from "@/components/posts/PostList";
 import { AlertBanner } from "@/components/ui/AlertBanner";
@@ -18,8 +18,6 @@ export default function GroupPostsPage() {
   const posts = usePosts(groupId, area.user?.email ?? null);
   const [isCreating, setIsCreating] = useState(false);
   const [notice, setNotice] = useState("");
-
-  const basePath = `/groups/${encodeURIComponent(groupId)}`;
 
   if (area.loading) {
     return (
@@ -58,20 +56,7 @@ export default function GroupPostsPage() {
   return (
     <main className="flex-1 max-w-4xl w-full mx-auto p-6">
       <GroupAreaHeader group={area.group} isLeader={area.isLeader} />
-
-      <nav className="flex gap-2 mb-6">
-        <Link href={basePath} className="btn-dark text-xs">
-          Quadro
-        </Link>
-        <Link href={`${basePath}/posts`} className="btn-green text-xs">
-          Posts
-        </Link>
-        {area.isLeader && (
-          <Link href={`${basePath}/settings`} className="btn-dark text-xs">
-            Configurações
-          </Link>
-        )}
-      </nav>
+      <GroupNavigation groupId={groupId} active="posts" isLeader={area.isLeader} />
 
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-bold text-[#333333]">Posts do Grupo</h2>

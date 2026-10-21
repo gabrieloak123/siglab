@@ -3,7 +3,6 @@ package br.ufrn.dimap.siglab.service;
 import br.ufrn.dimap.siglab.dto.CreatePostRequestDTO;
 import br.ufrn.dimap.siglab.dto.UpdatePostRequestDTO;
 import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
-import br.ufrn.dimap.siglab.integration.KeywordClient;
 import br.ufrn.dimap.siglab.model.Post;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.model.User_ResearchGroup;
@@ -21,12 +20,12 @@ public class PostService {
     private final ResearchGroupRepository groups;
     private final UserRepository users;
     private final User_ResearchGroupRepository memberships;
-    private final KeywordClient keywords;
-    private final InterestService interests;
+    private final IndexingQueue indexing;
+    private final PostLikeRepository likes;
     public PostService(PostRepository posts, ResearchGroupRepository groups, UserRepository users,
-                       User_ResearchGroupRepository memberships, KeywordClient keywords, InterestService interests) {
+                       User_ResearchGroupRepository memberships, IndexingQueue indexing, PostLikeRepository likes) {
         this.posts=posts; this.groups=groups; this.users=users; this.memberships=memberships;
-        this.keywords=keywords; this.interests=interests;
+        this.indexing=indexing; this.likes=likes;
     }
     @Transactional(readOnly=true)
     public List<Post> listar(String groupId, String email) {
@@ -41,39 +40,47 @@ public class PostService {
     @Transactional
     public Post criar(String groupId, String email, CreatePostRequestDTO request) {
         User publisher = checkLeader(groupId,email);
-        String[] terms=terms(request.getPostType(), request.getKeywords(), request.getContent());
+        String[] terms=terms(request.getPostType(), request.getKeywords());
         Post saved=posts.save(Post.builder().groupId(groupId).publisherUserId(publisher.getId())
                 .title(request.getTitle().trim()).description(request.getDescription()).content(request.getContent())
                 .tags(request.getTags()).filePath(request.getFilePath()).postType(request.getPostType().toUpperCase())
                 .keywords(terms).createdAt(LocalDateTime.now()).build());
-        interests.indexPost(saved.getId(),terms);
+        indexing.enqueue("POST", saved.getId().toString());
         return saved;
     }
     @Transactional
     public Post atualizar(String groupId, Long id, String email, UpdatePostRequestDTO request) {
         checkLeader(groupId,email);
         Post post=post(groupId,id);
-        String[] terms=terms(request.getPostType(),request.getKeywords(),request.getContent());
+        String[] terms=terms(request.getPostType(),request.getKeywords());
         post.setTitle(request.getTitle().trim()); post.setDescription(request.getDescription());
         post.setContent(request.getContent()); post.setTags(request.getTags()); post.setFilePath(request.getFilePath());
         post.setPostType(request.getPostType().toUpperCase()); post.setKeywords(terms);
         Post saved=posts.save(post);
-        interests.indexPost(id,terms);
+        indexing.enqueue("POST", saved.getId().toString());
         return saved;
     }
     @Transactional
     public void excluir(String groupId, Long id, String email) {
         checkLeader(groupId,email);
-        posts.delete(post(groupId,id));
+        Post target=post(groupId,id);
+        List<Long> affectedUsers=likes.usersForPost(id);
+        posts.delete(target);
+        posts.flush();
+        affectedUsers.forEach(likes::refreshVector);
     }
-    private String[] terms(String type, String[] supplied, String content) {
+    private String[] terms(String type, String[] supplied) {
         if ("ARTIGO".equalsIgnoreCase(type)) {
             if (supplied == null || supplied.length == 0) throw new IllegalArgumentException("Artigo precisa de palavras-chave.");
-            String[] clean=Arrays.stream(supplied).filter(s -> s != null && !s.isBlank()).map(String::trim).distinct().toArray(String[]::new);
+            String[] clean=Arrays.stream(supplied).filter(s -> s != null && !s.isBlank()).map(String::trim)
+                    .collect(java.util.stream.Collectors.toMap(s -> s.toLowerCase(java.util.Locale.ROOT), s -> s, (a,b) -> a, java.util.LinkedHashMap::new))
+                    .values().toArray(String[]::new);
             if (clean.length == 0) throw new IllegalArgumentException("Artigo precisa de palavras-chave.");
+            if (clean.length > 10 || Arrays.stream(clean).anyMatch(s -> s.length() > 100))
+                throw new IllegalArgumentException("Informe no máximo 10 palavras-chave de até 100 caracteres.");
             return clean;
         }
-        if ("OUTROS".equalsIgnoreCase(type)) return keywords.keywords(content);
+        if ("OUTROS".equalsIgnoreCase(type)) return new String[0];
         throw new IllegalArgumentException("Tipo de post deve ser ARTIGO ou OUTROS.");
     }
     private void checkGroup(String groupId) {

@@ -7,6 +7,7 @@ import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.service.ConferenceCountries;
 import br.ufrn.dimap.siglab.service.ConferenceService;
 import br.ufrn.dimap.siglab.service.SocialService;
+import br.ufrn.dimap.siglab.dto.ResearcherFollowRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -61,14 +62,18 @@ public class SocialController {
     public List<Post> feed(HttpServletRequest req, @RequestParam(defaultValue="false") boolean followedOnly) {
         return social.feed(me(req), followedOnly);
     }
+    @GetMapping("/recent-posts")
+    public List<Post> recentPosts() { return social.recentPosts(); }
     @GetMapping("/following")
     public Map<String,Object> following(HttpServletRequest req) {
         Long id=me(req);
-        return Map.of("researchers",social.followedResearchers(id),"groups",social.followedGroups(id));
+        return Map.of("researchers",social.followedResearchers(id),"researcherFollows",social.researcherFollows(id),"groups",social.followedGroups(id));
     }
     @PostMapping("/researchers/{id}/follow")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void followResearcher(HttpServletRequest req, @PathVariable Long id) { social.followResearcher(me(req), id); }
+    public void followResearcher(HttpServletRequest req, @PathVariable Long id, @RequestBody(required=false) ResearcherFollowRequest body) {
+        social.followResearcher(me(req), id, body == null ? null : body.interestAreas());
+    }
     @DeleteMapping("/researchers/{id}/follow")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unfollowResearcher(HttpServletRequest req, @PathVariable Long id) { social.unfollowResearcher(me(req), id); }
@@ -78,4 +83,10 @@ public class SocialController {
     @DeleteMapping("/groups/{id}/follow")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unfollowGroup(HttpServletRequest req, @PathVariable String id) { social.unfollowGroup(me(req), id); }
+    @GetMapping("/posts/{id}/like")
+    public SocialService.PostLike postLike(HttpServletRequest req, @PathVariable Long id) { return social.postLike(me(req), id); }
+    @PostMapping("/posts/{id}/like")
+    public SocialService.PostLike likePost(HttpServletRequest req, @PathVariable Long id) { return social.likePost(me(req), id); }
+    @DeleteMapping("/posts/{id}/like")
+    public SocialService.PostLike unlikePost(HttpServletRequest req, @PathVariable Long id) { return social.unlikePost(me(req), id); }
 }

@@ -14,10 +14,6 @@ import lombok.NoArgsConstructor;
 @Builder
 public class CreateTarefaRequestDTO {
 
-    @NotNull(message = "O ID do criador e obrigatorio")
-    @JsonProperty("id_criado_por")
-    private Long idCriadoPor;
-
     @JsonProperty("id_atribuido_a")
     private Long idAtribuidoA;
 

@@ -1,5 +1,7 @@
 package br.ufrn.dimap.siglab.service;
 
+import br.ufrn.dimap.siglab.exception.AuthenticationRequiredException;
+
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,7 +13,7 @@ public class SessionUser {
     public SessionUser(UserRepository users) { this.users=users; }
     public User require(HttpServletRequest request) {
         var session=request.getSession(false);
-        if (session == null || !(session.getAttribute("userId") instanceof Long id)) throw new SecurityException("Entre para continuar.");
-        return users.findById(id).orElseThrow(() -> new SecurityException("Sessão inválida."));
+        if (session == null || !(session.getAttribute("userId") instanceof Long id)) throw new AuthenticationRequiredException("Entre para continuar.");
+        return users.findById(id).orElseThrow(() -> new AuthenticationRequiredException("Sessão inválida."));
     }
 }

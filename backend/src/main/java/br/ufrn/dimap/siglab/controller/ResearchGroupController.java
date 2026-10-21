@@ -1,6 +1,8 @@
 package br.ufrn.dimap.siglab.controller;
 
 import br.ufrn.dimap.siglab.dto.GroupMemberDTO;
+import br.ufrn.dimap.siglab.dto.CreateGroupRequest;
+import br.ufrn.dimap.siglab.dto.UpdateGroupRequest;
 import br.ufrn.dimap.siglab.dto.InviteResponseDTO;
 import br.ufrn.dimap.siglab.dto.JoinGroupRequestDTO;
 import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
@@ -122,14 +124,16 @@ public class ResearchGroupController {
     }
 
     @PostMapping
-    public ResponseEntity<ResearchGroup> createResearchGroup(@Valid @RequestBody ResearchGroup researchGroup, HttpServletRequest servletRequest) {
-        ResearchGroup createdGroup = researchGroupService.createForUser(researchGroup, sessionUser.require(servletRequest).getEmail());
+    public ResponseEntity<ResearchGroup> createResearchGroup(@Valid @RequestBody CreateGroupRequest body, HttpServletRequest servletRequest) {
+        ResearchGroup group = ResearchGroup.builder().group_id(body.groupId()).name(body.name().trim()).research_fields(body.researchFields()).build();
+        ResearchGroup createdGroup = researchGroupService.createForUser(group, sessionUser.require(servletRequest).getEmail());
         return ResponseEntity.status(HttpStatus.CREATED).body(createdGroup);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ResearchGroup> updateResearchGroup(@PathVariable("id") String groupId, @Valid @RequestBody ResearchGroup groupDetails, HttpServletRequest servletRequest) {
+    public ResponseEntity<ResearchGroup> updateResearchGroup(@PathVariable("id") String groupId, @Valid @RequestBody UpdateGroupRequest body, HttpServletRequest servletRequest) {
         researchGroupService.requireLeader(groupId, sessionUser.require(servletRequest).getEmail());
+        ResearchGroup groupDetails = ResearchGroup.builder().name(body.name().trim()).research_fields(body.researchFields()).build();
         ResearchGroup updatedGroup = researchGroupService.update(groupId, groupDetails);
         return ResponseEntity.ok(updatedGroup);
     }

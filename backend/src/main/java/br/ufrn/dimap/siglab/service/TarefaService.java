@@ -36,15 +36,15 @@ public class TarefaService {
     }
 
     @Transactional
-    public Tarefa criar(String idGrupo, CreateTarefaRequestDTO request) {
+    public Tarefa criar(String idGrupo, Long creatorId, CreateTarefaRequestDTO request) {
         validarGrupo(idGrupo);
         buscarColunaDoGrupo(request.getIdColuna(), idGrupo);
-        validarMembro(request.getIdCriadoPor(), idGrupo, "criador");
+        validarMembro(creatorId, idGrupo, "criador");
         validarResponsavel(request.getIdAtribuidoA(), idGrupo);
 
         Tarefa tarefa = Tarefa.builder()
                 .idGrupo(idGrupo)
-                .idCriadoPor(request.getIdCriadoPor())
+                .idCriadoPor(creatorId)
                 .idAtribuidoA(request.getIdAtribuidoA())
                 .idColuna(request.getIdColuna())
                 .titulo(request.getTitulo().trim())

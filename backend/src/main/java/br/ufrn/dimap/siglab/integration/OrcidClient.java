@@ -10,14 +10,15 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.util.Map;
 
 @Component
-public class OrcidClient {
+public class OrcidClient implements OrcidIdentityProvider {
     private final String clientId, clientSecret, redirectUri, baseUrl;
-    private final RestClient client = RestClient.create();
+    private final RestClient client;
     public OrcidClient(@Value("${ORCID_CLIENT_ID:}") String clientId,
                        @Value("${ORCID_CLIENT_SECRET:}") String clientSecret,
                        @Value("${ORCID_REDIRECT_URI:http://localhost:3000/backend-api/api/auth/orcid/callback}") String redirectUri,
-                       @Value("${ORCID_BASE_URL:https://orcid.org}") String baseUrl) {
+                       @Value("${ORCID_BASE_URL:https://orcid.org}") String baseUrl, RestClient client) {
         this.clientId=clientId; this.clientSecret=clientSecret; this.redirectUri=redirectUri; this.baseUrl=baseUrl;
+        this.client=client;
     }
     public boolean configured() { return !clientId.isBlank() && !clientSecret.isBlank(); }
     public String authorizationUrl(String state) {
@@ -41,5 +42,4 @@ public class OrcidClient {
     }
     private String enc(String value) { return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8); }
     private void requireConfigured() { if (!configured()) throw new ExternalServiceException("Configure ORCID_CLIENT_ID e ORCID_CLIENT_SECRET."); }
-    public record Identity(String orcid, String name) {}
 }

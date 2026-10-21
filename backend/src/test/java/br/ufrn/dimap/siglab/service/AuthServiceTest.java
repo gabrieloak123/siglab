@@ -1,10 +1,8 @@
 package br.ufrn.dimap.siglab.service;
 
 import br.ufrn.dimap.siglab.integration.GoogleIdentityClient;
-import br.ufrn.dimap.siglab.integration.ScholarClient;
 import br.ufrn.dimap.siglab.dto.RegistrationRequest;
 import br.ufrn.dimap.siglab.dto.GoogleLoginRequest;
-import br.ufrn.dimap.siglab.dto.ScholarCandidate;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,20 +22,9 @@ class AuthServiceTest {
     @Mock InterestService interests;
     @Mock GoogleIdentityClient google;
     @Mock PasswordEncoder encoder;
-    @Mock ScholarClient scholar;
     AuthService service;
-    @BeforeEach void setup() { service = new AuthService(users,userService,interests,google,encoder,scholar); }
+    @BeforeEach void setup() { service = new AuthService(users,userService,interests,google,encoder); }
 
-    @Test void completesMissingScholarAreasWithProvidedAreas() {
-        when(interests.withScholar(eq("author"), any(String[].class))).thenReturn(new String[]{"IA", "Robótica", "Visão"});
-        assertArrayEquals(new String[]{"IA", "Robótica", "Visão"}, service.areas("author",new String[]{"Visão"}));
-    }
-    @Test void acceptsThreeManualAreasWithoutScholarAuthorId() {
-        String[] manual = {"IA", "Robótica", "Visão"};
-        when(interests.three(manual)).thenReturn(manual);
-        assertArrayEquals(manual, service.areas(null, manual));
-        verify(interests, never()).withScholar(anyString(), any());
-    }
     @Test void registersWithoutScholarAuthorId() {
         String[] manual = {"IA", "Robótica", "Visão"};
         when(interests.three(manual)).thenReturn(manual);
@@ -48,8 +35,13 @@ class AuthServiceTest {
         assertNull(created.getAuthorId());
         assertArrayEquals(manual, created.getInterest_areas());
     }
+    @Test void rejectsScholarAuthorIdBeforeOrcidAuthentication() {
+        assertThrows(IllegalArgumentException.class, () -> service.register(
+                new RegistrationRequest("Ada", "ada@lab.org", "secret", "scholar-id", new String[]{"IA", "Robótica", "Visão"})));
+        verifyNoInteractions(userService);
+    }
     @Test void rejectsWrongPassword() {
-        when(users.findByEmail("a@b.com")).thenReturn(Optional.of(User.builder().email("a@b.com").password("hash").build()));
+        when(users.findByEmailIgnoreCase("a@b.com")).thenReturn(Optional.of(User.builder().email("a@b.com").password("hash").build()));
         when(encoder.matches("wrong", "hash")).thenReturn(false);
         assertThrows(SecurityException.class, () -> service.login("a@b.com", "wrong"));
     }
@@ -66,14 +58,13 @@ class AuthServiceTest {
         when(users.save(current)).thenReturn(current);
         assertEquals("google-sub", service.linkGoogle(current, "credential").getGoogleSubject());
     }
-    @Test void discoversScholarCandidatesAfterGoogleVerification() {
-        var candidate = new ScholarCandidate("author", "Ada", "UFRN", "ufrn.br", java.util.List.of("IA"));
+    @Test void previewsGoogleIdentityWithoutSearchingScholar() {
         when(google.verify("credential")).thenReturn(new GoogleIdentityClient.Identity("sub", "ada@ufrn.br", "Ada", "ufrn.br"));
         when(users.findByGoogleSubject("sub")).thenReturn(Optional.empty());
-        when(scholar.searchProfiles("Ada")).thenReturn(java.util.List.of(candidate));
         var preview=service.previewGoogle("credential");
         assertFalse(preview.existingUser());
-        assertEquals(java.util.List.of(candidate), preview.candidates());
+        assertEquals("Ada", preview.name());
+        assertEquals("ada@ufrn.br", preview.email());
     }
     @Test void marksManagedGoogleAccountAsInstitutional() {
         String[] manual={"IA", "Robótica", "Visão"};

@@ -11,18 +11,21 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class EmbeddingClient {
-    /** Lote por requisição à Cloudflare (bge-m3 aceita múltiplos textos; 16 é conservador). */
-    private static final int BATCH_SIZE = 16;
-
+public class EmbeddingClient implements EmbeddingProvider {
     private final String accountId;
     private final String token;
-    private final RestClient client = RestClient.create();
+    private final RestClient client;
+    private final String modelUrl;
+    private static final int BATCH_SIZE = 16;
 
     public EmbeddingClient(@Value("${CLOUDFLARE_ACCOUNT_ID:}") String accountId,
-                           @Value("${CLOUDFLARE_API_TOKEN:}") String token) {
+                           @Value("${CLOUDFLARE_API_TOKEN:}") String token,
+                           @Value("${CLOUDFLARE_EMBEDDING_URL:https://api.cloudflare.com/client/v4/accounts/{id}/ai/run/@cf/baai/bge-m3}") String modelUrl,
+                           RestClient client) {
         this.accountId = accountId;
         this.token = token;
+        this.modelUrl = modelUrl;
+        this.client = client;
     }
 
     public float[] embed(String text) {
@@ -47,7 +50,7 @@ public class EmbeddingClient {
 
     private List<float[]> invoke(List<String> batch) {
         try {
-            Map<?, ?> response = client.post().uri("https://api.cloudflare.com/client/v4/accounts/{id}/ai/run/@cf/baai/bge-m3", accountId)
+            Map<?, ?> response = client.post().uri(modelUrl, accountId)
                     .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("text", batch)).retrieve().body(Map.class);
             if (response == null || !(response.get("result") instanceof Map<?, ?> result)

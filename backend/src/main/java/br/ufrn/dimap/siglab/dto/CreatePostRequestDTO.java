@@ -8,13 +8,13 @@ import lombok.Data;
 public class CreatePostRequestDTO {
     @NotBlank @Size(max=255)
     private String title;
-    private String description;
-    @NotBlank
+    @Size(max=5000) private String description;
+    @NotBlank @Size(max=100000)
     private String content;
-    private String[] tags;
+    @Size(max=20) private String[] tags;
     @Size(max=500)
     private String filePath;
     @NotBlank
     private String postType;
-    private String[] keywords;
+    @Size(max=10) private String[] keywords;
 }
