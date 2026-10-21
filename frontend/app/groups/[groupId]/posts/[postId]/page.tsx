@@ -4,10 +4,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { GroupAreaHeader } from "@/components/groups/GroupAreaHeader";
-import { GroupNavigation } from "@/components/groups/GroupNavigation";
 import { MarkdownContent } from "@/components/posts/MarkdownContent";
 import { PostEditor } from "@/components/posts/PostEditor";
+import { PostLikeButton } from "@/components/posts/PostLikeButton";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { GroupBadge } from "@/components/ui/GroupBadge";
 import { useFeedback } from "@/hooks/useFeedback";
@@ -133,11 +132,6 @@ export default function PostDetailPage() {
         ← Voltar para todos os posts
       </Link>
 
-      {area.group && (
-        <GroupAreaHeader group={area.group} isLeader={area.isLeader} />
-      )}
-      <GroupNavigation groupId={groupId} active="posts" isLeader={area.isLeader} />
-
       <AlertBanner message={feedback.error} variant="error" />
       <AlertBanner message={feedback.success} variant="success" />
 
@@ -220,6 +214,7 @@ export default function PostDetailPage() {
           )}
 
           <MarkdownContent content={post.content ?? ""} />
+          <div className="mt-6 border-t border-gray-200 pt-4"><PostLikeButton postId={post.id} /></div>
         </article>
       )}
     </main>

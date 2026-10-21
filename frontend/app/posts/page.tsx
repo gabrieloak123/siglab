@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PostEditor } from "@/components/posts/PostEditor";
+import { PostLikeButton } from "@/components/posts/PostLikeButton";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { groupsApi, messageOf, postsApi, socialApi } from "@/lib/api";
 import { readStoredUser } from "@/lib/storage";
@@ -16,13 +17,16 @@ export default function NetworkPostsPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   const user = typeof window === "undefined" ? null : readStoredUser();
   useEffect(() => {
     queueMicrotask(() => { if (new URLSearchParams(window.location.search).has("create")) setCreating(true); });
   }, []);
   const load = useCallback(async () => {
+    setRefreshing(true);
     try { setPosts(await socialApi.feed(followedOnly)); setError(""); }
     catch (caught) { setError(messageOf(caught, { api: "Não foi possível carregar os posts.", network: "Falha de conexão." })); }
+    finally { setRefreshing(false); }
   }, [followedOnly]);
   useEffect(() => { void (async () => { await load(); })(); }, [load]);
   useEffect(() => {
@@ -49,7 +53,12 @@ export default function NetworkPostsPage() {
         catch (caught) { setError(messageOf(caught, { api: "Não foi possível publicar o post.", network: "Falha de conexão." })); return false; }
       }} />
     </div>}
-    <label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={followedOnly} onChange={event => setFollowedOnly(event.target.checked)} /> Recomendações relevantes de pesquisadores ou grupos que sigo</label>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={followedOnly} onChange={event => setFollowedOnly(event.target.checked)} /> Recomendações relevantes de pesquisadores ou grupos que sigo</label>
+      <button type="button" onClick={() => void load()} disabled={refreshing} className="w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-wait disabled:opacity-60 sm:w-auto" aria-label="Recarregar posts">
+        <span aria-hidden="true" className={`mr-1 inline-block ${refreshing ? "animate-spin" : ""}`}>↻</span> {refreshing ? "Recarregando..." : "Recarregar posts"}
+      </button>
+    </div>
     <AlertBanner message={error} variant="error" /><AlertBanner message={notice} variant="success" />
     {posts.length === 0 && !error && <p className="text-gray-500 text-sm">Nenhum post encontrado.</p>}
     {posts.map(post => <article key={post.id} className="bg-white border rounded p-5 space-y-2">
@@ -57,6 +66,7 @@ export default function NetworkPostsPage() {
       <h2 className="font-bold text-lg"><Link className="text-green-700 hover:underline" href={`/groups/${encodeURIComponent(post.groupId)}/posts/${post.id}`}>{post.title}</Link></h2>
       {post.description && <p className="text-sm">{post.description}</p>}
       <p className="text-xs text-gray-500">{post.keywords?.join(" · ")}</p>
+      <PostLikeButton postId={post.id} />
     </article>)}
   </main>;
 }
