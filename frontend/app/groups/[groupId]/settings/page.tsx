@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { GroupAreaHeader } from "@/components/groups/GroupAreaHeader";
+import { GroupNavigation } from "@/components/groups/GroupNavigation";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { DangerZone } from "@/components/ui/DangerZone";
 import { FormField, inputClassName } from "@/components/ui/FormField";
@@ -31,6 +32,10 @@ function GroupSettingsForm({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (parseList(fields).length !== 3) {
+      feedback.fail("Informe exatamente três linhas de pesquisa.");
+      return;
+    }
     feedback.begin();
 
     try {
@@ -205,6 +210,7 @@ export default function GroupSettingsPage() {
   return (
     <main className="flex-1 max-w-3xl w-full mx-auto p-6">
       <GroupAreaHeader group={area.group} isLeader={area.isLeader} />
+      <GroupNavigation groupId={groupId} active="settings" isLeader={area.isLeader} />
 
       <GroupSettingsForm
         key={area.group.group_id}

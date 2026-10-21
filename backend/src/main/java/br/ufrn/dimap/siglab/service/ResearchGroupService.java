@@ -3,6 +3,7 @@ package br.ufrn.dimap.siglab.service;
 import br.ufrn.dimap.siglab.dto.GroupMemberDTO;
 import br.ufrn.dimap.siglab.dto.InviteResponseDTO;
 import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
+import br.ufrn.dimap.siglab.exception.ConflictException;
 import br.ufrn.dimap.siglab.model.*;
 import br.ufrn.dimap.siglab.repository.GroupInviteRepository;
 import br.ufrn.dimap.siglab.repository.ResearchGroupRepository;
@@ -28,17 +29,21 @@ public class ResearchGroupService {
     private final UserRepository userRepository;
     private final GroupInviteRepository groupInviteRepository;
     private final PasswordEncoder passwordEncoder;
+    private final InterestService interests;
+    private final IndexingQueue indexing;
 
     public ResearchGroupService(ResearchGroupRepository researchGroupRepository,
                                 User_ResearchGroupRepository userResearchGroupRepository,
                                 UserRepository userRepository,
                                 GroupInviteRepository groupInviteRepository,
-                                PasswordEncoder passwordEncoder) {
+                                PasswordEncoder passwordEncoder, InterestService interests, IndexingQueue indexing) {
         this.researchGroupRepository = researchGroupRepository;
         this.userResearchGroupRepository = userResearchGroupRepository;
         this.userRepository = userRepository;
         this.groupInviteRepository = groupInviteRepository;
         this.passwordEncoder = passwordEncoder;
+        this.interests = interests;
+        this.indexing = indexing;
     }
 
     /**
@@ -71,14 +76,31 @@ public class ResearchGroupService {
      */
     @Transactional
     public ResearchGroup save(ResearchGroup researchGroup) {
+        researchGroup.setResearch_fields(interests.three(researchGroup.getResearch_fields()));
         if (researchGroup.getGroup_id() != null && !researchGroup.getGroup_id().isBlank()) {
             String trimmedId = researchGroup.getGroup_id().trim();
             researchGroup.setGroup_id(trimmedId);
             if (researchGroupRepository.existsById(trimmedId)) {
-                throw new IllegalArgumentException("Já existe um grupo de pesquisa cadastrado com o ID: " + trimmedId);
+                throw new ConflictException("Já existe um grupo de pesquisa cadastrado com o ID: " + trimmedId);
             }
         }
-        return researchGroupRepository.save(researchGroup);
+        ResearchGroup saved = researchGroupRepository.saveAndFlush(researchGroup);
+        indexing.enqueue("GROUP", saved.getGroup_id());
+        return saved;
+    }
+
+    @Transactional
+    public ResearchGroup createForUser(ResearchGroup group, String email) {
+        ResearchGroup saved = save(group);
+        setMemberLeadership(saved.getGroup_id(), email, true);
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public void requireLeader(String groupId, String email) {
+        if (!userResearchGroupRepository.findById(new User_ResearchGroupId(email, groupId))
+                .map(User_ResearchGroup::isLeader).orElse(false))
+            throw new SecurityException("Apenas líderes do grupo podem executar esta ação.");
     }
 
     /**
@@ -94,11 +116,13 @@ public class ResearchGroupService {
         return researchGroupRepository.findById(groupId)
                 .map(group -> {
                     group.setName(groupDetails.getName());
-                    group.setResearch_fields(groupDetails.getResearch_fields());
+                    group.setResearch_fields(interests.three(groupDetails.getResearch_fields()));
                     if (groupDetails.getMembers() != null) {
                         group.setMembers(groupDetails.getMembers());
                     }
-                    return researchGroupRepository.save(group);
+                    ResearchGroup saved = researchGroupRepository.save(group);
+                    indexing.enqueue("GROUP", saved.getGroup_id());
+                    return saved;
                 })
                 .orElseThrow(() -> new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId));
     }
@@ -189,7 +213,7 @@ public class ResearchGroupService {
      */
     @Transactional
     public GroupMemberDTO setMemberLeadership(String groupId, String userEmail, boolean isLeader) {
-        ResearchGroup researchGroup = researchGroupRepository.findById(groupId)
+        ResearchGroup researchGroup = researchGroupRepository.findForUpdate(groupId)
                 .orElseThrow(() -> new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId));
 
         User user = userRepository.findByEmail(userEmail)
@@ -202,6 +226,8 @@ public class ResearchGroupService {
                     newUrg.setId(id);
                     return newUrg;
                 });
+
+        if (!isLeader && userResearchGroup.isLeader()) ensureOtherLeader(groupId);
 
         userResearchGroup.setUser(user);
         userResearchGroup.setResearchGroup(researchGroup);
@@ -229,9 +255,8 @@ public class ResearchGroupService {
      */
     @Transactional
     public void removeMemberFromGroup(String groupId, String userEmail, String requesterEmail) {
-        if (!researchGroupRepository.existsById(groupId)) {
-            throw new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId);
-        }
+        researchGroupRepository.findForUpdate(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId));
 
         if (requesterEmail == null || requesterEmail.isBlank()) {
             throw new SecurityException("Acesso negado: a identificação do usuário solicitante é obrigatória.");
@@ -247,9 +272,15 @@ public class ResearchGroupService {
         }
 
         User_ResearchGroupId targetId = new User_ResearchGroupId(userEmail, groupId);
-        if (userResearchGroupRepository.existsById(targetId)) {
-            userResearchGroupRepository.deleteById(targetId);
-        }
+        userResearchGroupRepository.findById(targetId).ifPresent(target -> {
+            if (target.isLeader()) ensureOtherLeader(groupId);
+            userResearchGroupRepository.delete(target);
+        });
+    }
+
+    private void ensureOtherLeader(String groupId) {
+        long leaders = userResearchGroupRepository.findByGroupId(groupId).stream().filter(User_ResearchGroup::isLeader).count();
+        if (leaders <= 1) throw new IllegalStateException("O grupo deve manter pelo menos um líder.");
     }
 
     /**
@@ -283,7 +314,8 @@ public class ResearchGroupService {
             throw new SecurityException("Acesso negado: apenas líderes do grupo podem gerar tokens de convite.");
         }
 
-        int days = (expirationDays != null && expirationDays > 0) ? expirationDays : 7;
+        int days = expirationDays == null ? 7 : expirationDays;
+        if (days < 1 || days > 30) throw new IllegalArgumentException("A validade do convite deve ser entre 1 e 30 dias.");
         String token = "INV-" + groupId + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime expiresAt = now.plusDays(days);

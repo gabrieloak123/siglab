@@ -65,6 +65,23 @@ public class User {
     @Column(name = "interest_areas")
     private String[] interest_areas;
 
+    @Column(name = "author_id", unique = true)
+    private String authorId;
+
+    @JsonIgnore
+    @Column(name = "google_subject", unique = true)
+    private String googleSubject;
+
+    @Column(name = "orcid", unique = true)
+    private String orcid;
+
+    @Column(name = "verification_level", nullable = false)
+    @Builder.Default
+    private String verificationLevel = "NAO_VERIFICADO";
+
+    @Column(name = "institutional_domain")
+    private String institutionalDomain;
+
     /**
      * Lista de associações com grupos de pesquisa através da entidade de junção {@link User_ResearchGroup}.
      */

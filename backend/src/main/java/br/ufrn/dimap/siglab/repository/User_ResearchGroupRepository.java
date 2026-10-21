@@ -15,6 +15,9 @@ public interface User_ResearchGroupRepository extends JpaRepository<User_Researc
     @Query("SELECT urg FROM User_ResearchGroup urg WHERE urg.researchGroup.group_id = :groupId")
     List<User_ResearchGroup> findByGroupId(@Param("groupId") String groupId);
 
+    @Query("SELECT urg FROM User_ResearchGroup urg WHERE urg.id.userEmail = :email")
+    List<User_ResearchGroup> findByUserEmail(@Param("email") String email);
+
     @Query("""
             SELECT CASE WHEN COUNT(urg) > 0 THEN true ELSE false END
             FROM User_ResearchGroup urg

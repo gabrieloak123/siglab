@@ -1,11 +1,17 @@
 package br.ufrn.dimap.siglab.service;
 
 import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
+import br.ufrn.dimap.siglab.exception.ConflictException;
+import br.ufrn.dimap.siglab.dto.UpdateUserRequest;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.repository.UserRepository;
+import br.ufrn.dimap.siglab.repository.ResearchGroupRepository;
+import br.ufrn.dimap.siglab.repository.User_ResearchGroupRepository;
+import br.ufrn.dimap.siglab.model.User_ResearchGroup;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,6 +25,11 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final InterestService interests;
+    private final IndexingQueue indexing;
+    private final TransactionTemplate transaction;
+    private final ResearchGroupRepository groups;
+    private final User_ResearchGroupRepository memberships;
 
     /**
      * Construtor para injeção de dependências do repositório de usuários e codificador de senhas.
@@ -26,9 +37,15 @@ public class UserService {
      * @param userRepository o repositório {@link UserRepository}
      * @param passwordEncoder o codificador de senhas {@link PasswordEncoder}
      */
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, InterestService interests, IndexingQueue indexing,
+                       TransactionTemplate transaction, ResearchGroupRepository groups, User_ResearchGroupRepository memberships) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.interests = interests;
+        this.indexing = indexing;
+        this.transaction = transaction;
+        this.groups = groups;
+        this.memberships = memberships;
     }
 
     /**
@@ -72,19 +89,26 @@ public class UserService {
      */
     @Transactional
     public User save(User user) {
+        if (user.getAuthorId() != null && !user.getAuthorId().isBlank()) {
+            if (!"ORCID".equals(user.getVerificationLevel()))
+                throw new SecurityException("Vincule o ORCID antes de informar o author_id.");
+            user.setAuthorId(user.getAuthorId().trim());
+            if (userRepository.existsByAuthorId(user.getAuthorId())) throw new ConflictException("author_id já cadastrado.");
+        } else {
+            user.setAuthorId(null);
+        }
+        user.setInterest_areas(interests.three(user.getInterest_areas()));
         if (user.getEmail() != null && !user.getEmail().isBlank()) {
             String trimmedEmail = user.getEmail().trim();
             user.setEmail(trimmedEmail);
-            if (userRepository.existsByEmail(trimmedEmail)) {
-                throw new IllegalArgumentException("Já existe um usuário cadastrado com o e-mail: " + trimmedEmail);
+            if (userRepository.existsByEmailIgnoreCase(trimmedEmail)) {
+                throw new ConflictException("Já existe um usuário cadastrado com esse e-mail.");
             }
         }
-        if (user.getPassword() != null && !user.getPassword().isBlank()) {
-            if (!isAlreadyBcryptEncoded(user.getPassword())) {
-                user.setPassword(passwordEncoder.encode(user.getPassword()));
-            }
-        }
-        return userRepository.save(user);
+        if (user.getPassword() != null && !user.getPassword().isBlank()) user.setPassword(passwordEncoder.encode(user.getPassword()));
+        User saved = userRepository.save(user);
+        indexing.enqueue("USER", saved.getId().toString());
+        return saved;
     }
 
     /**
@@ -95,23 +119,38 @@ public class UserService {
      * @return o usuário atualizado
      * @throws ResourceNotFoundException se o usuário não for encontrado
      */
-    @Transactional
-    public User update(Long id, User userDetails) {
-        return userRepository.findById(id)
-                .map(user -> {
-                    user.setName(userDetails.getName());
-                    user.setEmail(userDetails.getEmail());
-                    if (userDetails.getPassword() != null && !userDetails.getPassword().isBlank()) {
-                        if (!isAlreadyBcryptEncoded(userDetails.getPassword())) {
-                            user.setPassword(passwordEncoder.encode(userDetails.getPassword()));
-                        } else {
-                            user.setPassword(userDetails.getPassword());
-                        }
-                    }
-                    user.setInterest_areas(userDetails.getInterest_areas());
-                    return userRepository.save(user);
-                })
+    public User update(Long id, UpdateUserRequest userDetails) {
+        if (userDetails.name() == null || userDetails.name().isBlank()
+                || userDetails.email() == null || userDetails.email().isBlank())
+            throw new IllegalArgumentException("Nome e e-mail são obrigatórios.");
+        User current = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o ID: " + id));
+        String authorId = userDetails.authorId() == null || userDetails.authorId().isBlank() ? null : userDetails.authorId().trim();
+        boolean scholarChanged = !java.util.Objects.equals(authorId, current.getAuthorId());
+        if (scholarChanged && authorId != null && !"ORCID".equals(current.getVerificationLevel()))
+            throw new SecurityException("Vincule o ORCID antes de informar o author_id.");
+        String[] areas = interests.three(userDetails.interestAreas());
+        return transaction.execute(status -> {
+                    User user = userRepository.findById(id)
+                            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o ID: " + id));
+                    user.setName(userDetails.name().trim());
+                    String email = userDetails.email().trim();
+                    userRepository.findByEmailIgnoreCase(email).filter(existing -> !existing.getId().equals(id))
+                            .ifPresent(existing -> { throw new ConflictException("E-mail já cadastrado."); });
+                    user.setEmail(email);
+                    if (userDetails.password() != null && !userDetails.password().isBlank()) {
+                        user.setPassword(passwordEncoder.encode(userDetails.password()));
+                    }
+                    if (authorId != null) {
+                        if (!authorId.equals(user.getAuthorId()) && userRepository.existsByAuthorId(authorId))
+                            throw new ConflictException("author_id já cadastrado.");
+                    }
+                    user.setAuthorId(authorId);
+                    user.setInterest_areas(areas);
+                    User saved = userRepository.save(user);
+                    indexing.enqueue("USER", saved.getId().toString());
+                    return saved;
+                });
     }
 
     /**
@@ -135,17 +174,15 @@ public class UserService {
             throw new SecurityException("Senha incorreta. Não foi possível excluir a conta.");
         }
 
+        List<String> ledGroups = memberships.findByUserEmail(user.getEmail()).stream()
+                .filter(User_ResearchGroup::isLeader).map(m -> m.getId().getGroupId()).sorted().toList();
+        for (String groupId : ledGroups) {
+            groups.findForUpdate(groupId);
+            long leaders = memberships.findByGroupId(groupId).stream().filter(User_ResearchGroup::isLeader).count();
+            if (leaders <= 1) throw new IllegalStateException("Transfira a liderança do grupo " + groupId + " antes de excluir a conta.");
+        }
+
         userRepository.deleteById(id);
     }
 
-    /**
-     * Verifica se uma hash de senha já está formatada no padrão BCrypt ($2a$, $2b$ ou $2y$).
-     *
-     * @param password a string de senha
-     * @return {@code true} se já for uma hash BCrypt válida
-     */
-    private boolean isAlreadyBcryptEncoded(String password) {
-        if (password == null) return false;
-        return password.startsWith("$2a$") || password.startsWith("$2b$") || password.startsWith("$2y$");
-    }
 }

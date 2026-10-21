@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { GroupAreaHeader } from "@/components/groups/GroupAreaHeader";
 import { MarkdownContent } from "@/components/posts/MarkdownContent";
 import { PostEditor } from "@/components/posts/PostEditor";
+import { PostLikeButton } from "@/components/posts/PostLikeButton";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { GroupBadge } from "@/components/ui/GroupBadge";
 import { useFeedback } from "@/hooks/useFeedback";
@@ -128,23 +128,9 @@ export default function PostDetailPage() {
 
   return (
     <main className="flex-1 max-w-4xl w-full mx-auto p-6">
-      {area.group && (
-        <GroupAreaHeader group={area.group} isLeader={area.isLeader} />
-      )}
-
-      <nav className="flex gap-2 mb-6">
-        <Link href={basePath} className="btn-dark text-xs">
-          Quadro
-        </Link>
-        <Link href={`${basePath}/posts`} className="btn-dark text-xs">
-          Posts
-        </Link>
-        {area.isLeader && (
-          <Link href={`${basePath}/settings`} className="btn-dark text-xs">
-            Configurações
-          </Link>
-        )}
-      </nav>
+      <Link href="/posts" className="inline-block mb-4 text-sm text-green-700 font-semibold hover:underline">
+        ← Voltar para todos os posts
+      </Link>
 
       <AlertBanner message={feedback.error} variant="error" />
       <AlertBanner message={feedback.success} variant="success" />
@@ -160,23 +146,18 @@ export default function PostDetailPage() {
             onCancel={() => setIsEditing(false)}
             onSubmit={async (payload) => {
               feedback.begin();
-              const updated = await postsApi.update(
-                groupId,
-                post.id,
-                requesterEmail as string,
-                payload
-              );
-              feedback.setLoading(false);
-
-              if (!updated) {
-                feedback.fail("Não foi possível atualizar o post.");
+              try {
+                const updated = await postsApi.update(groupId, post.id, requesterEmail as string, payload);
+                setPost(updated);
+                setIsEditing(false);
+                feedback.succeed("Post atualizado com sucesso!");
+                return true;
+              } catch (caught) {
+                feedback.fail(messageOf(caught, { api: "Não foi possível atualizar o post.", network: "Falha de conexão." }));
                 return false;
+              } finally {
+                feedback.setLoading(false);
               }
-
-              setPost(updated);
-              setIsEditing(false);
-              feedback.succeed("Post atualizado com sucesso!");
-              return true;
             }}
           />
         </div>
@@ -233,6 +214,7 @@ export default function PostDetailPage() {
           )}
 
           <MarkdownContent content={post.content ?? ""} />
+          <div className="mt-6 border-t border-gray-200 pt-4"><PostLikeButton postId={post.id} /></div>
         </article>
       )}
     </main>

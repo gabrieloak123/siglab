@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
+import { GroupAreaHeader } from "@/components/groups/GroupAreaHeader";
+import { GroupNavigation } from "@/components/groups/GroupNavigation";
 import { groupsApi, kanbanApi, messageOf } from "@/lib/api";
 import { readStoredUser } from "@/lib/storage";
 import type { GroupMember, KanbanBoard, KanbanTask, ResearchGroup, User } from "@/types";
@@ -109,7 +111,7 @@ export default function GroupAreaPage(){
   async function createTask(event:FormEvent){
     event.preventDefault();if(!user?.id)return;setCreating(true);setError("");
     try{
-      await kanbanApi.createTask(groupId,{id_criado_por:user.id,id_atribuido_a:draft.responsavel?Number(draft.responsavel):null,id_coluna:Number(draft.coluna),titulo:draft.titulo.trim(),descricao:draft.descricao.trim()||null,tags:parseTags(draft.tags)});
+      await kanbanApi.createTask(groupId,{id_atribuido_a:draft.responsavel?Number(draft.responsavel):null,id_coluna:Number(draft.coluna),titulo:draft.titulo.trim(),descricao:draft.descricao.trim()||null,tags:parseTags(draft.tags)});
       setDraft({titulo:"",descricao:"",responsavel:"",coluna:"",tags:""});setShowCreate(false);await loadBoard();
     }catch(caught){setError(messageOf(caught,{api:"Não foi possível criar a tarefa.",network:"Falha de conexão com o servidor."}))}
     finally{setCreating(false)}
@@ -135,12 +137,16 @@ export default function GroupAreaPage(){
   const isLeader=members.some(member=>member.id===user?.id&&member.isLeader);
   const total=board.colunas.reduce((sum,column)=>sum+column.tarefas.length,0);
   return <main className={styles.page}>
-    <header className={styles.header}><div className={styles.headerInner}><nav className={styles.groupNav}><Link href="/" className={styles.back}>← Meus grupos</Link><Link href={`/groups/${encodeURIComponent(groupId)}/posts`} className={styles.back}>Posts</Link>{isLeader&&<Link href={`/groups/${encodeURIComponent(groupId)}/settings`} className={styles.back}>Configurações</Link>}</nav><div className={styles.identity}><span>{group.group_id}</span><div><p>Grupo de pesquisa</p><h1>{group.name}</h1></div></div><div className={styles.members}><span>{members.slice(0,4).map(member=><i key={member.id} title={member.name}>{member.name.charAt(0).toUpperCase()}</i>)}</span><b>{members.length} {members.length===1?"membro":"membros"}</b></div></div></header>
-    <div className={styles.content}>
+    <div className={styles.shell}>
+      <GroupAreaHeader group={group} isLeader={isLeader} />
+      <GroupNavigation groupId={groupId} active="board" isLeader={isLeader} />
+      <div className={styles.members}><span>{members.slice(0,4).map(member=><i key={member.id} title={member.name}>{member.name.charAt(0).toUpperCase()}</i>)}</span><b>{members.length} {members.length===1?"membro":"membros"}</b></div>
+      <div className={styles.content}>
       <section className={styles.sectionTitle}><div><span className={styles.eyebrow}>Organização do trabalho</span><h2>Tarefas</h2><p>Acompanhe as atividades do grupo e arraste cartões para atualizar o andamento.</p></div><div><span className={styles.total}>{total} {total===1?"tarefa":"tarefas"}</span><button onClick={()=>setShowCreate(!showCreate)}>{showCreate?"Fechar":"+ Nova tarefa"}</button></div></section>
       {error&&<div className={styles.banner}>{error}<button onClick={()=>setError("")}>×</button></div>}
       {showCreate&&<form className={styles.create} onSubmit={createTask}><div><h3>Nova tarefa</h3><p>Adicione uma atividade ao quadro do grupo.</p></div><div className={styles.formGrid}><label>Título<input required value={draft.titulo} onChange={e=>setDraft({...draft,titulo:e.target.value})}/></label><label>Coluna<select required value={draft.coluna} onChange={e=>setDraft({...draft,coluna:e.target.value})}><option value="">Selecione</option>{board.colunas.map(column=><option key={column.id} value={column.id}>{column.nome}</option>)}</select></label><label>Responsável<select value={draft.responsavel} onChange={e=>setDraft({...draft,responsavel:e.target.value})}><option value="">Sem responsável</option>{members.map(member=><option key={member.id} value={member.id}>{member.name}</option>)}</select></label><label>Tags<input placeholder="artigo, urgente" value={draft.tags} onChange={e=>setDraft({...draft,tags:e.target.value})}/></label><label className={styles.full}>Descrição<textarea value={draft.descricao} onChange={e=>setDraft({...draft,descricao:e.target.value})}/></label></div><button disabled={creating}>{creating?"Criando...":"Criar tarefa"}</button></form>}
       <section className={styles.board}>{board.colunas.map(column=><div key={column.id} className={`${styles.column} ${dropTarget===column.id?styles.dropTarget:""}`} onDragEnter={()=>setDropTarget(column.id)} onDragOver={event=>event.preventDefault()} onDrop={event=>{event.preventDefault();void moveTask(column.id)}}><div className={styles.columnHeader}><div><i/><h3>{column.nome}</h3></div><span>{column.tarefas.length}</span></div><div className={styles.taskList}>{column.tarefas.map(task=><TaskCard key={task.id} task={task} members={members} groupId={groupId} reload={refresh} onDrag={setDragged}/>)}{column.tarefas.length===0&&<div className={styles.emptyColumn}>Nenhuma tarefa nesta etapa</div>}</div></div>)}</section>
+      </div>
     </div>
   </main>;
 }
