@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ConferencePanel } from "@/components/groups/ConferencePanel";
+import { ConferenceSearch } from "@/components/groups/ConferenceSearch";
 import { Dashboard } from "@/components/groups/Dashboard";
 import { PublicGroupsSection } from "@/components/groups/PublicGroupsSection";
 import { SocialPanel } from "@/components/groups/SocialPanel";
@@ -10,6 +11,7 @@ import { AuthModal } from "@/components/modals/AuthModal";
 import { ProfileModal } from "@/components/modals/ProfileModal";
 import { RecentPosts } from "@/components/posts/RecentPosts";
 import { AlertBanner } from "@/components/ui/AlertBanner";
+import { useEffect, useState } from "react";
 import { useAuth, type ProfilePayload } from "@/hooks/useAuth";
 import { useFeedback } from "@/hooks/useFeedback";
 import { useResearchGroups } from "@/hooks/useResearchGroups";
@@ -54,8 +56,8 @@ export default function Home() {
           Complete três áreas de interesse em <button className="font-bold underline" onClick={() => void openProfile()}>Gerenciar Perfil</button> para receber sugestões.
         </div>}
       {auth.user
-        ? <><Dashboard groups={groups} feedback={feedback} /><SocialPanel /></>
-        : <><RecentPosts /><PublicGroupsSection groups={groups.allGroups} /></>}
+         ? <><Dashboard groups={groups} feedback={feedback} /><SocialPanel /><ConferencePanel /><ConferenceSearch /></>
+          : <><RecentPosts /> <PublicGroupsSection groups={groups.allGroups} /></>}
     </main>
     {authOpen && <AuthModal open={authOpen} feedback={feedback} onClose={() => setAuthOpen(false)}
       onLogin={async (email, password) => { const ok = await auth.login(email, password); if (ok) setAuthOpen(false); return ok; }}

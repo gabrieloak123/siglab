@@ -64,7 +64,7 @@ public class SocialService {
         return vectors.suggestedPosts(me, followedOnly, maxFollowedDistance).stream().map(posts::findById).flatMap(java.util.Optional::stream).toList();
     }
     @Transactional(readOnly = true)
-    public List<Post> recentPosts() { return posts.findTop5ByOrderByCreatedAtDesc(); }
+    public List<Post> recentPosts() { return posts.findTop6ByOrderByCreatedAtDesc(); }
     public List<Long> followedResearchers(Long me) { return follows.researchers(me); }
     public List<FollowRepository.ResearcherFollow> researcherFollows(Long me) { return follows.researcherFollows(me); }
     public List<String> followedGroups(Long me) { return follows.groups(me); }

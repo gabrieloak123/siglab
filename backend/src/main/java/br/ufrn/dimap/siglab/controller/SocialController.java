@@ -1,13 +1,18 @@
 package br.ufrn.dimap.siglab.controller;
 
+import br.ufrn.dimap.siglab.dto.ConferenceSuggestionDTO;
 import br.ufrn.dimap.siglab.model.Post;
 import br.ufrn.dimap.siglab.model.ResearchGroup;
 import br.ufrn.dimap.siglab.model.User;
+import br.ufrn.dimap.siglab.service.ConferenceCountries;
+import br.ufrn.dimap.siglab.service.ConferenceService;
 import br.ufrn.dimap.siglab.service.SocialService;
 import br.ufrn.dimap.siglab.dto.ResearcherFollowRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 
@@ -15,7 +20,11 @@ import java.util.Map;
 @RequestMapping("/api/social")
 public class SocialController {
     private final SocialService social;
-    public SocialController(SocialService social) { this.social=social; }
+    private final ConferenceService conferences;
+    public SocialController(SocialService social, ConferenceService conferences) {
+        this.social = social;
+        this.conferences = conferences;
+    }
     private Long me(HttpServletRequest request) {
         var session=request.getSession(false);
         return social.userId(session == null ? null : session.getAttribute("userId"));
@@ -24,6 +33,31 @@ public class SocialController {
     public List<User> researchers(HttpServletRequest req) { return social.researchers(me(req)); }
     @GetMapping("/suggestions/groups")
     public List<ResearchGroup> groups(HttpServletRequest req) { return social.groups(me(req)); }
+    @GetMapping("/suggestions/conferences")
+    public List<ConferenceSuggestionDTO> suggestionConferences(HttpServletRequest req) {
+        return conferences.recommend(me(req));
+    }
+    @GetMapping("/conferences/search")
+    public List<ConferenceSuggestionDTO> searchConferences(HttpServletRequest req,
+            @RequestParam(required = false) String start, @RequestParam(required = false) String end,
+            @RequestParam(required = false) String field, @RequestParam(required = false) String country) {
+        me(req);
+        return conferences.search(field, date(start, "início"), date(end, "fim"), country);
+    }
+    @GetMapping("/conferences/countries")
+    public List<String> conferenceCountries(HttpServletRequest req) {
+        me(req);
+        return ConferenceCountries.names();
+    }
+    private static LocalDate date(String value, String label) {
+        if (value == null || value.isBlank())
+            throw new IllegalArgumentException("Informe a data de " + label + ".");
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException("Data de " + label + " inválida; use o formato AAAA-MM-DD.");
+        }
+    }
     @GetMapping("/feed")
     public List<Post> feed(HttpServletRequest req, @RequestParam(defaultValue="false") boolean followedOnly) {
         return social.feed(me(req), followedOnly);
