@@ -19,4 +19,13 @@ class GlobalExceptionHandlerTest {
                 new AuthenticationRequiredException("Sessão necessária"), new MockHttpServletRequest());
         assertEquals(401, response.getStatusCode().value());
     }
+
+    @Test void domainExceptionsReturnTheirExpectedStatus() {
+        var handler = new GlobalExceptionHandler();
+        var request = new MockHttpServletRequest("GET", "/api/test");
+        assertEquals(403, handler.handleAccessDenied(new AccessDeniedException("negado"), request).getStatusCode().value());
+        assertEquals(400, handler.handleDomainValidation(new InvalidInterestAreasException("areas"), request).getStatusCode().value());
+        assertEquals(400, handler.handleDomainValidation(new InvalidConferenceSearchException("busca"), request).getStatusCode().value());
+        assertEquals(409, handler.handleGroupMustHaveLeader(new GroupMustHaveLeaderException("lider"), request).getStatusCode().value());
+    }
 }

@@ -6,6 +6,7 @@ import br.ufrn.dimap.siglab.dto.GooglePreviewResponse;
 import br.ufrn.dimap.siglab.integration.GoogleIdentityProvider;
 import br.ufrn.dimap.siglab.exception.AuthenticationRequiredException;
 import br.ufrn.dimap.siglab.exception.ConflictException;
+import br.ufrn.dimap.siglab.exception.AccessDeniedException;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -61,7 +62,7 @@ public class AuthService {
     public User linkGoogle(User current, String credential) {
         var identity = google.verify(credential);
         if (!current.getEmail().equalsIgnoreCase(identity.email()))
-            throw new SecurityException("A conta Google deve usar o mesmo e-mail da conta atual.");
+            throw new AccessDeniedException("A conta Google deve usar o mesmo e-mail da conta atual.");
         users.findByGoogleSubject(identity.subject()).ifPresent(existing -> {
             if (!existing.getId().equals(current.getId())) throw new ConflictException("Conta Google já vinculada a outro usuário.");
         });

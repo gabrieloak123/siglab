@@ -8,6 +8,7 @@ import br.ufrn.dimap.siglab.service.ConferenceCountries;
 import br.ufrn.dimap.siglab.service.ConferenceService;
 import br.ufrn.dimap.siglab.service.SocialService;
 import br.ufrn.dimap.siglab.dto.ResearcherFollowRequest;
+import br.ufrn.dimap.siglab.exception.InvalidConferenceSearchException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -51,11 +52,11 @@ public class SocialController {
     }
     private static LocalDate date(String value, String label) {
         if (value == null || value.isBlank())
-            throw new IllegalArgumentException("Informe a data de " + label + ".");
+            throw new InvalidConferenceSearchException("Informe a data de " + label + ".");
         try {
             return LocalDate.parse(value);
         } catch (DateTimeParseException ex) {
-            throw new IllegalArgumentException("Data de " + label + " inválida; use o formato AAAA-MM-DD.");
+            throw new InvalidConferenceSearchException("Data de " + label + " inválida; use o formato AAAA-MM-DD.");
         }
     }
     @GetMapping("/feed")

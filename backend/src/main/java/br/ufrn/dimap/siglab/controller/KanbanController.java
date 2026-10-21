@@ -1,5 +1,7 @@
 package br.ufrn.dimap.siglab.controller;
 
+import br.ufrn.dimap.siglab.exception.AccessDeniedException;
+
 import br.ufrn.dimap.siglab.dto.CreateTarefaRequestDTO;
 import br.ufrn.dimap.siglab.dto.MoveTarefaRequestDTO;
 import br.ufrn.dimap.siglab.dto.UpdateTarefaRequestDTO;
@@ -46,7 +48,7 @@ public class KanbanController {
     private User requireMember(String groupId, HttpServletRequest request) {
         User user = sessionUser.require(request);
         if (!memberships.existsMemberByUserIdAndGroupId(user.getId(), groupId))
-            throw new SecurityException("Apenas membros podem acessar o quadro do grupo.");
+            throw new AccessDeniedException("Apenas membros podem acessar o quadro do grupo.");
         return user;
     }
 

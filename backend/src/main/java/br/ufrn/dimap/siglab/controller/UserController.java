@@ -1,6 +1,7 @@
 package br.ufrn.dimap.siglab.controller;
 
 import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
+import br.ufrn.dimap.siglab.exception.AccessDeniedException;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.service.UserService;
 import br.ufrn.dimap.siglab.service.SessionUser;
@@ -56,7 +57,7 @@ public class UserController {
 
     @PutMapping("/{id}")
     public ResponseEntity<User> updateUser(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest userDetails, HttpServletRequest request) {
-        if (!sessionUser.require(request).getId().equals(id)) throw new SecurityException("Só é possível editar o próprio perfil.");
+        if (!sessionUser.require(request).getId().equals(id)) throw new AccessDeniedException("Só é possível editar o próprio perfil.");
         User updatedUser = userService.update(id, userDetails);
         return ResponseEntity.ok(updatedUser);
     }
@@ -66,7 +67,7 @@ public class UserController {
             @PathVariable Long id,
             HttpServletRequest request,
             @RequestParam(value = "password", required = false) String password) {
-        if (!sessionUser.require(request).getId().equals(id)) throw new SecurityException("Só é possível excluir a própria conta.");
+        if (!sessionUser.require(request).getId().equals(id)) throw new AccessDeniedException("Só é possível excluir a própria conta.");
         userService.deleteById(id, password);
         return ResponseEntity.noContent().build();
     }

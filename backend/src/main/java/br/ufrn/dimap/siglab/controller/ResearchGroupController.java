@@ -6,6 +6,7 @@ import br.ufrn.dimap.siglab.dto.UpdateGroupRequest;
 import br.ufrn.dimap.siglab.dto.InviteResponseDTO;
 import br.ufrn.dimap.siglab.dto.JoinGroupRequestDTO;
 import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
+import br.ufrn.dimap.siglab.exception.AccessDeniedException;
 import br.ufrn.dimap.siglab.model.ResearchGroup;
 import br.ufrn.dimap.siglab.service.ResearchGroupService;
 import br.ufrn.dimap.siglab.service.SessionUser;
@@ -81,7 +82,7 @@ public class ResearchGroupController {
     @PostMapping("/join")
     public ResponseEntity<GroupMemberDTO> joinGroupWithToken(@Valid @RequestBody JoinGroupRequestDTO request, HttpServletRequest servletRequest) {
         String email = sessionUser.require(servletRequest).getEmail();
-        if (!email.equalsIgnoreCase(request.getUserEmail())) throw new SecurityException("Convite deve ser usado pela conta autenticada.");
+        if (!email.equalsIgnoreCase(request.getUserEmail())) throw new AccessDeniedException("Convite deve ser usado pela conta autenticada.");
         GroupMemberDTO member = researchGroupService.joinGroupWithToken(request.getInviteToken(), email);
         return ResponseEntity.ok(member);
     }

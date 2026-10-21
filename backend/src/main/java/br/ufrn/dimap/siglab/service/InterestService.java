@@ -2,6 +2,7 @@ package br.ufrn.dimap.siglab.service;
 
 import br.ufrn.dimap.siglab.integration.EmbeddingProvider;
 import br.ufrn.dimap.siglab.integration.ResearchProfileProvider;
+import br.ufrn.dimap.siglab.exception.InvalidInterestAreasException;
 import br.ufrn.dimap.siglab.model.ResearchGroup;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.model.Post;
@@ -32,13 +33,13 @@ public class InterestService {
         return three(merged.toArray(String[]::new));
     }
     public String[] three(String[] values) {
-        if (values == null) throw new IllegalArgumentException("Informe três áreas de interesse.");
+        if (values == null) throw new InvalidInterestAreasException("Informe três áreas de interesse.");
         String[] cleaned = Arrays.stream(values).filter(v -> v != null && !v.isBlank())
                 .map(String::trim).collect(java.util.stream.Collectors.toMap(v -> v.toLowerCase(java.util.Locale.ROOT), v -> v,
                         (a,b) -> a, java.util.LinkedHashMap::new)).values().toArray(String[]::new);
-        if (cleaned.length != 3) throw new IllegalArgumentException("Informe exatamente três áreas de interesse distintas.");
+        if (cleaned.length != 3) throw new InvalidInterestAreasException("Informe exatamente três áreas de interesse distintas.");
         if (Arrays.stream(cleaned).anyMatch(value -> value.length() > 255))
-            throw new IllegalArgumentException("Cada área deve ter no máximo 255 caracteres.");
+            throw new InvalidInterestAreasException("Cada área deve ter no máximo 255 caracteres.");
         return cleaned;
     }
     public void index(User user) { vectors.user(user.getId(), embedding.embed(String.join(", ", three(user.getInterest_areas())))); }

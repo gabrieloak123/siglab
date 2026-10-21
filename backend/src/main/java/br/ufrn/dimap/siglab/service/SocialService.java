@@ -2,6 +2,7 @@ package br.ufrn.dimap.siglab.service;
 
 import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
 import br.ufrn.dimap.siglab.exception.AuthenticationRequiredException;
+import br.ufrn.dimap.siglab.exception.InvalidInterestAreasException;
 import br.ufrn.dimap.siglab.model.Post;
 import br.ufrn.dimap.siglab.model.ResearchGroup;
 import br.ufrn.dimap.siglab.model.User;
@@ -46,7 +47,7 @@ public class SocialService {
         var selected=java.util.Arrays.stream(requested).filter(java.util.Objects::nonNull).map(String::trim).filter(a -> !a.isBlank())
                 .map(a -> valid.get(a.toLowerCase(java.util.Locale.ROOT))).filter(java.util.Objects::nonNull).distinct().toArray(String[]::new);
         if (selected.length == 0 || selected.length != java.util.Arrays.stream(requested).filter(java.util.Objects::nonNull).map(String::trim).filter(a -> !a.isBlank()).distinct().count())
-            throw new IllegalArgumentException("Selecione somente áreas de interesse do pesquisador.");
+            throw new InvalidInterestAreasException("Selecione somente áreas de interesse do pesquisador.");
         return selected;
     }
     @Transactional

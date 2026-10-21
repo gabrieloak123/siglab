@@ -1,6 +1,7 @@
 package br.ufrn.dimap.siglab.service;
 
 import br.ufrn.dimap.siglab.dto.ConferenceSuggestionDTO;
+import br.ufrn.dimap.siglab.exception.InvalidConferenceSearchException;
 import br.ufrn.dimap.siglab.exception.ExternalServiceException;
 import br.ufrn.dimap.siglab.integration.ConferenceClient;
 import br.ufrn.dimap.siglab.integration.ConferenceClient.Venue;
@@ -153,13 +154,13 @@ class ConferenceServiceTest {
         LocalDate start = LocalDate.of(2027, 1, 1);
         LocalDate end = LocalDate.of(2027, 12, 31);
 
-        assertThrows(IllegalArgumentException.class, () -> service.search("nope", start, end, null));
-        assertThrows(IllegalArgumentException.class, () -> service.search("ai", null, end, null));
-        assertThrows(IllegalArgumentException.class, () -> service.search("ai", start, null, null));
-        assertThrows(IllegalArgumentException.class, () -> service.search("ai", end, start, null));
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(InvalidConferenceSearchException.class, () -> service.search("nope", start, end, null));
+        assertThrows(InvalidConferenceSearchException.class, () -> service.search("ai", null, end, null));
+        assertThrows(InvalidConferenceSearchException.class, () -> service.search("ai", start, null, null));
+        assertThrows(InvalidConferenceSearchException.class, () -> service.search("ai", end, start, null));
+        assertThrows(InvalidConferenceSearchException.class,
                 () -> service.search("ai", start, start.plusYears(6), null));
-        assertThrows(IllegalArgumentException.class, () -> service.search("ai", start, end, "Atlantis"));
+        assertThrows(InvalidConferenceSearchException.class, () -> service.search("ai", start, end, "Atlantis"));
 
         verifyNoInteractions(client);
     }

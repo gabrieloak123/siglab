@@ -4,6 +4,8 @@ import br.ufrn.dimap.siglab.dto.GroupMemberDTO;
 import br.ufrn.dimap.siglab.dto.InviteResponseDTO;
 import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
 import br.ufrn.dimap.siglab.exception.ConflictException;
+import br.ufrn.dimap.siglab.exception.AccessDeniedException;
+import br.ufrn.dimap.siglab.exception.GroupMustHaveLeaderException;
 import br.ufrn.dimap.siglab.model.*;
 import br.ufrn.dimap.siglab.repository.GroupInviteRepository;
 import br.ufrn.dimap.siglab.repository.ResearchGroupRepository;
@@ -100,7 +102,7 @@ public class ResearchGroupService {
     public void requireLeader(String groupId, String email) {
         if (!userResearchGroupRepository.findById(new User_ResearchGroupId(email, groupId))
                 .map(User_ResearchGroup::isLeader).orElse(false))
-            throw new SecurityException("Apenas líderes do grupo podem executar esta ação.");
+            throw new AccessDeniedException("Apenas líderes do grupo podem executar esta ação.");
     }
 
     /**
@@ -143,7 +145,7 @@ public class ResearchGroupService {
         }
 
         if (leaderEmail == null || leaderEmail.isBlank()) {
-            throw new SecurityException("Acesso negado: a identificação do líder/orientador é obrigatória para excluir o grupo.");
+            throw new AccessDeniedException("Acesso negado: a identificação do líder/orientador é obrigatória para excluir o grupo.");
         }
 
         User_ResearchGroupId requesterId = new User_ResearchGroupId(leaderEmail, groupId);
@@ -152,18 +154,18 @@ public class ResearchGroupService {
                 .orElse(false);
 
         if (!isLeader) {
-            throw new SecurityException("Acesso negado: apenas orientadores/líderes do grupo podem excluí-lo.");
+            throw new AccessDeniedException("Acesso negado: apenas orientadores/líderes do grupo podem excluí-lo.");
         }
 
         if (leaderPassword == null || leaderPassword.isBlank()) {
-            throw new SecurityException("A confirmação da senha do orientador é obrigatória para excluir o grupo de pesquisa.");
+            throw new AccessDeniedException("A confirmação da senha do orientador é obrigatória para excluir o grupo de pesquisa.");
         }
 
         User leader = userRepository.findByEmail(leaderEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário orientador não encontrado com o e-mail: " + leaderEmail));
 
         if (!passwordEncoder.matches(leaderPassword, leader.getPassword())) {
-            throw new SecurityException("Senha incorreta do orientador. Não foi possível excluir o grupo de pesquisa.");
+            throw new AccessDeniedException("Senha incorreta do orientador. Não foi possível excluir o grupo de pesquisa.");
         }
 
         groupInviteRepository.deleteByGroupId(groupId);
@@ -259,7 +261,7 @@ public class ResearchGroupService {
                 .orElseThrow(() -> new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId));
 
         if (requesterEmail == null || requesterEmail.isBlank()) {
-            throw new SecurityException("Acesso negado: a identificação do usuário solicitante é obrigatória.");
+            throw new AccessDeniedException("Acesso negado: a identificação do usuário solicitante é obrigatória.");
         }
 
         User_ResearchGroupId requesterId = new User_ResearchGroupId(requesterEmail, groupId);
@@ -268,7 +270,7 @@ public class ResearchGroupService {
                 .orElse(false);
 
         if (!isLeader) {
-            throw new SecurityException("Acesso negado: apenas líderes do grupo podem remover membros.");
+            throw new AccessDeniedException("Acesso negado: apenas líderes do grupo podem remover membros.");
         }
 
         User_ResearchGroupId targetId = new User_ResearchGroupId(userEmail, groupId);
@@ -280,7 +282,7 @@ public class ResearchGroupService {
 
     private void ensureOtherLeader(String groupId) {
         long leaders = userResearchGroupRepository.findByGroupId(groupId).stream().filter(User_ResearchGroup::isLeader).count();
-        if (leaders <= 1) throw new IllegalStateException("O grupo deve manter pelo menos um líder.");
+        if (leaders <= 1) throw new GroupMustHaveLeaderException("O grupo deve manter pelo menos um líder.");
     }
 
     /**
@@ -302,7 +304,7 @@ public class ResearchGroupService {
                 .orElseThrow(() -> new ResourceNotFoundException("Grupo de pesquisa não encontrado com o ID: " + groupId));
 
         if (requesterEmail == null || requesterEmail.isBlank()) {
-            throw new SecurityException("Acesso negado: a identificação do usuário solicitante é obrigatória.");
+            throw new AccessDeniedException("Acesso negado: a identificação do usuário solicitante é obrigatória.");
         }
 
         User_ResearchGroupId requesterId = new User_ResearchGroupId(requesterEmail, groupId);
@@ -311,7 +313,7 @@ public class ResearchGroupService {
                 .orElse(false);
 
         if (!isLeader) {
-            throw new SecurityException("Acesso negado: apenas líderes do grupo podem gerar tokens de convite.");
+            throw new AccessDeniedException("Acesso negado: apenas líderes do grupo podem gerar tokens de convite.");
         }
 
         int days = expirationDays == null ? 7 : expirationDays;

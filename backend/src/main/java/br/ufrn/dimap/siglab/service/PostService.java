@@ -3,6 +3,7 @@ package br.ufrn.dimap.siglab.service;
 import br.ufrn.dimap.siglab.dto.CreatePostRequestDTO;
 import br.ufrn.dimap.siglab.dto.UpdatePostRequestDTO;
 import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
+import br.ufrn.dimap.siglab.exception.AccessDeniedException;
 import br.ufrn.dimap.siglab.model.Post;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.model.User_ResearchGroup;
@@ -87,12 +88,12 @@ public class PostService {
         if (!groups.existsById(groupId)) throw new ResourceNotFoundException("Grupo não encontrado: " + groupId);
     }
     private void checkReader(String email) {
-        if (email == null || !users.existsByEmail(email)) throw new SecurityException("Entre para acessar os posts.");
+        if (email == null || !users.existsByEmail(email)) throw new AccessDeniedException("Entre para acessar os posts.");
     }
     private User checkLeader(String groupId, String email) {
         checkGroup(groupId); checkReader(email);
         boolean leader=memberships.findById(new User_ResearchGroupId(email,groupId)).map(User_ResearchGroup::isLeader).orElse(false);
-        if (!leader) throw new SecurityException("Apenas líderes podem gerenciar posts.");
+        if (!leader) throw new AccessDeniedException("Apenas líderes podem gerenciar posts.");
         return users.findByEmail(email).orElseThrow();
     }
     private Post post(String groupId,Long id) {

@@ -1,6 +1,7 @@
 package br.ufrn.dimap.siglab.controller;
 
 import br.ufrn.dimap.siglab.dto.*;
+import br.ufrn.dimap.siglab.exception.AccessDeniedException;
 import br.ufrn.dimap.siglab.service.InterestService;
 import br.ufrn.dimap.siglab.service.OrcidService;
 import br.ufrn.dimap.siglab.model.User;
@@ -88,7 +89,7 @@ public class AuthController {
         Object expected=request.getSession().getAttribute("orcidState");
         request.getSession().removeAttribute("orcidState");
         if (!(expected instanceof String value) || !java.security.MessageDigest.isEqual(value.getBytes(), state.getBytes()))
-            throw new SecurityException("Estado OAuth do ORCID inválido.");
+            throw new AccessDeniedException("Estado OAuth do ORCID inválido.");
         User user=sessionUser.require(request);
         orcid.link(user.getId(), code);
         return new RedirectView(appBaseUrl + "/?orcid=linked");

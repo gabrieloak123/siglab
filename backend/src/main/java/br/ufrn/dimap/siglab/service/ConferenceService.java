@@ -4,6 +4,8 @@ import br.ufrn.dimap.siglab.integration.ConferenceClient;
 import br.ufrn.dimap.siglab.integration.ConferenceClient.Venue;
 import br.ufrn.dimap.siglab.integration.EmbeddingClient;
 import br.ufrn.dimap.siglab.dto.ConferenceSuggestionDTO;
+import br.ufrn.dimap.siglab.exception.InvalidConferenceSearchException;
+import br.ufrn.dimap.siglab.exception.AuthenticationRequiredException;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.repository.ConferenceRepository;
 import br.ufrn.dimap.siglab.repository.ConferenceRepository.StoredVenue;
@@ -100,7 +102,7 @@ public class ConferenceService {
      */
     public List<ConferenceSuggestionDTO> recommend(Long userId) {
         User user = users.findById(userId)
-                .orElseThrow(() -> new SecurityException("Entre para continuar."));
+                .orElseThrow(() -> new AuthenticationRequiredException("Entre para continuar."));
         List<String> keys = keys(user.getInterest_areas());
         if (keys.isEmpty()) return List.of();
         ensureFresh(keys);
@@ -151,15 +153,15 @@ public class ConferenceService {
 
     private static void validateSearch(String field, LocalDate start, LocalDate end, String country) {
         if (field == null || !FIELD_ALIASES.containsKey(field))
-            throw new IllegalArgumentException("Área de pesquisa inválida.");
+            throw new InvalidConferenceSearchException("Área de pesquisa inválida.");
         if (start == null || end == null)
-            throw new IllegalArgumentException("Informe as datas de início e fim.");
+            throw new InvalidConferenceSearchException("Informe as datas de início e fim.");
         if (end.isBefore(start))
-            throw new IllegalArgumentException("A data final deve ser igual ou posterior à data inicial.");
+            throw new InvalidConferenceSearchException("A data final deve ser igual ou posterior à data inicial.");
         if (ChronoUnit.DAYS.between(start, end) > SEARCH_MAX_DAYS)
-            throw new IllegalArgumentException("O intervalo máximo de busca é de 5 anos.");
+            throw new InvalidConferenceSearchException("O intervalo máximo de busca é de 5 anos.");
         if (country != null && !country.isBlank() && !ConferenceCountries.isKnown(country))
-            throw new IllegalArgumentException("País inválido.");
+            throw new InvalidConferenceSearchException("País inválido.");
     }
 
     private static ConferenceSuggestionDTO toDto(Venue venue) {

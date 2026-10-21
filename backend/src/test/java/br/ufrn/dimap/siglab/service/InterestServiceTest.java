@@ -2,6 +2,7 @@ package br.ufrn.dimap.siglab.service;
 
 import br.ufrn.dimap.siglab.integration.EmbeddingClient;
 import br.ufrn.dimap.siglab.integration.ScholarClient;
+import br.ufrn.dimap.siglab.exception.InvalidInterestAreasException;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.model.Post;
 import br.ufrn.dimap.siglab.repository.VectorRepository;
@@ -23,8 +24,8 @@ class InterestServiceTest {
     @BeforeEach void setup() { service = new InterestService(scholar, embeddings, vectors); }
 
     @Test void requiresThreeDistinctNonEmptyAreas() {
-        assertThrows(IllegalArgumentException.class, () -> service.three(new String[]{"IA", " IA ", "Robótica"}));
-        assertThrows(IllegalArgumentException.class, () -> service.three(new String[]{"IA", "", "Robótica"}));
+        assertThrows(InvalidInterestAreasException.class, () -> service.three(new String[]{"IA", " IA ", "Robótica"}));
+        assertThrows(InvalidInterestAreasException.class, () -> service.three(new String[]{"IA", "", "Robótica"}));
         assertArrayEquals(new String[]{"IA", "Robótica", "Visão"}, service.three(new String[]{" IA ", "Robótica", "Visão"}));
     }
 
@@ -40,7 +41,7 @@ class InterestServiceTest {
         when(scholar.interests("author")).thenReturn(List.of("IA", "Robótica"));
         assertArrayEquals(new String[]{"IA", "Robótica", "Visão"},
                 service.withScholar("author", new String[]{"Visão"}));
-        assertThrows(IllegalArgumentException.class, () -> service.withScholar("author", new String[0]));
+        assertThrows(InvalidInterestAreasException.class, () -> service.withScholar("author", new String[0]));
     }
 
     @Test void indexesArticleUsingKeywordsAndAbstract() {

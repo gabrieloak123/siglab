@@ -2,6 +2,8 @@ package br.ufrn.dimap.siglab.service;
 
 import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
 import br.ufrn.dimap.siglab.exception.ConflictException;
+import br.ufrn.dimap.siglab.exception.AccessDeniedException;
+import br.ufrn.dimap.siglab.exception.GroupMustHaveLeaderException;
 import br.ufrn.dimap.siglab.dto.UpdateUserRequest;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.repository.UserRepository;
@@ -91,7 +93,7 @@ public class UserService {
     public User save(User user) {
         if (user.getAuthorId() != null && !user.getAuthorId().isBlank()) {
             if (!"ORCID".equals(user.getVerificationLevel()))
-                throw new SecurityException("Vincule o ORCID antes de informar o author_id.");
+                throw new AccessDeniedException("Vincule o ORCID antes de informar o author_id.");
             user.setAuthorId(user.getAuthorId().trim());
             if (userRepository.existsByAuthorId(user.getAuthorId())) throw new ConflictException("author_id já cadastrado.");
         } else {
@@ -128,7 +130,7 @@ public class UserService {
         String authorId = userDetails.authorId() == null || userDetails.authorId().isBlank() ? null : userDetails.authorId().trim();
         boolean scholarChanged = !java.util.Objects.equals(authorId, current.getAuthorId());
         if (scholarChanged && authorId != null && !"ORCID".equals(current.getVerificationLevel()))
-            throw new SecurityException("Vincule o ORCID antes de informar o author_id.");
+            throw new AccessDeniedException("Vincule o ORCID antes de informar o author_id.");
         String[] areas = interests.three(userDetails.interestAreas());
         return transaction.execute(status -> {
                     User user = userRepository.findById(id)
@@ -167,11 +169,11 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o ID: " + id));
 
         if (password == null || password.isBlank()) {
-            throw new SecurityException("A confirmação da senha é obrigatória para excluir a conta de usuário.");
+            throw new AccessDeniedException("A confirmação da senha é obrigatória para excluir a conta de usuário.");
         }
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new SecurityException("Senha incorreta. Não foi possível excluir a conta.");
+            throw new AccessDeniedException("Senha incorreta. Não foi possível excluir a conta.");
         }
 
         List<String> ledGroups = memberships.findByUserEmail(user.getEmail()).stream()
@@ -179,7 +181,7 @@ public class UserService {
         for (String groupId : ledGroups) {
             groups.findForUpdate(groupId);
             long leaders = memberships.findByGroupId(groupId).stream().filter(User_ResearchGroup::isLeader).count();
-            if (leaders <= 1) throw new IllegalStateException("Transfira a liderança do grupo " + groupId + " antes de excluir a conta.");
+            if (leaders <= 1) throw new GroupMustHaveLeaderException("Transfira a liderança do grupo " + groupId + " antes de excluir a conta.");
         }
 
         userRepository.deleteById(id);

@@ -53,6 +53,27 @@ public class GlobalExceptionHandler {
                 .message(ex.getMessage()).path(request.getRequestURI()).build());
     }
 
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponseDTO> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponseDTO.builder()
+                .timestamp(LocalDateTime.now()).status(403).error("Forbidden")
+                .message(ex.getMessage()).path(request.getRequestURI()).build());
+    }
+
+    @ExceptionHandler({InvalidInterestAreasException.class, InvalidConferenceSearchException.class})
+    public ResponseEntity<ErrorResponseDTO> handleDomainValidation(RuntimeException ex, HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(ErrorResponseDTO.builder()
+                .timestamp(LocalDateTime.now()).status(400).error("Bad Request")
+                .message(ex.getMessage()).path(request.getRequestURI()).build());
+    }
+
+    @ExceptionHandler(GroupMustHaveLeaderException.class)
+    public ResponseEntity<ErrorResponseDTO> handleGroupMustHaveLeader(GroupMustHaveLeaderException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponseDTO.builder()
+                .timestamp(LocalDateTime.now()).status(409).error("Conflict")
+                .message(ex.getMessage()).path(request.getRequestURI()).build());
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponseDTO> handleIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
         log.warn("Conflito de integridade em {}", request.getRequestURI());
