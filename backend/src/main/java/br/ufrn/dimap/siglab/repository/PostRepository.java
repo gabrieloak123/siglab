@@ -18,7 +18,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
      */
     List<Post> findByGroupIdOrderByCreatedAtDesc(String groupId);
 
-    List<Post> findTop5ByOrderByCreatedAtDesc();
+    List<Post> findTop6ByOrderByCreatedAtDesc();
 
     /**
      * Busca um post garantindo que ele pertença ao grupo informado.

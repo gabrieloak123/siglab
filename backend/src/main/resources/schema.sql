@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS conference_vectors (
 CREATE TABLE IF NOT EXISTS conference_field_refresh (
   field VARCHAR(255) PRIMARY KEY,
   refreshed_at TIMESTAMP NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS user_discovery_vectors (
   user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   embedding vector(1024) NOT NULL

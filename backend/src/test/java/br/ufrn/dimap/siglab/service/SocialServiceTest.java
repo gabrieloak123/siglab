@@ -52,7 +52,7 @@ class SocialServiceTest {
     }
     @Test void recentPostsDoNotRequireRecommendationBackfill() {
         SocialService service = service();
-        when(posts.findTop5ByOrderByCreatedAtDesc()).thenReturn(java.util.List.of());
+        when(posts.findTop6ByOrderByCreatedAtDesc()).thenReturn(java.util.List.of());
         assertTrue(service.recentPosts().isEmpty());
         verifyNoInteractions(vectors);
     }

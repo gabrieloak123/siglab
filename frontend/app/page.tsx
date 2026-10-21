@@ -57,7 +57,7 @@ export default function Home() {
         </div>}
       {auth.user
          ? <><Dashboard groups={groups} feedback={feedback} /><SocialPanel /><ConferencePanel /><ConferenceSearch /></>
-          : <><RecentPosts /> <PublicGroupsSection groups={groups.allGroups} />}
+          : <><RecentPosts /> <PublicGroupsSection groups={groups.allGroups} /></>}
     </main>
     {authOpen && <AuthModal open={authOpen} feedback={feedback} onClose={() => setAuthOpen(false)}
       onLogin={async (email, password) => { const ok = await auth.login(email, password); if (ok) setAuthOpen(false); return ok; }}

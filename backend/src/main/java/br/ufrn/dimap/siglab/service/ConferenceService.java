@@ -81,15 +81,13 @@ public class ConferenceService {
     private final ConferenceClient client;
     private final ConferenceRepository conferences;
     private final EmbeddingClient embeddings;
-    private final IndexBackfillService backfill;
 
     public ConferenceService(UserRepository users, ConferenceClient client, ConferenceRepository conferences,
-                             EmbeddingClient embeddings, IndexBackfillService backfill) {
+                             EmbeddingClient embeddings) {
         this.users = users;
         this.client = client;
         this.conferences = conferences;
         this.embeddings = embeddings;
-        this.backfill = backfill;
     }
 
     /**
@@ -101,7 +99,6 @@ public class ConferenceService {
      *         ou a Cloudflare falharem (respondido como HTTP 503)
      */
     public List<ConferenceSuggestionDTO> recommend(Long userId) {
-        backfill.ensureProfiles();
         User user = users.findById(userId)
                 .orElseThrow(() -> new SecurityException("Entre para continuar."));
         List<String> keys = keys(user.getInterest_areas());

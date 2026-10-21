@@ -31,10 +31,9 @@ class ConferenceServiceTest {
     @Mock ConferenceClient client;
     @Mock ConferenceRepository conferences;
     @Mock EmbeddingClient embeddings;
-    @Mock IndexBackfillService backfill;
     ConferenceService service;
 
-    @BeforeEach void setup() { service = new ConferenceService(users, client, conferences, embeddings, backfill); }
+    @BeforeEach void setup() { service = new ConferenceService(users, client, conferences, embeddings); }
 
     @Test void mapsPortugueseAndEnglishAreasToApiFields() {
         assertEquals(List.of("ai", "vision", "security"),
@@ -78,7 +77,6 @@ class ConferenceServiceTest {
 
         service.recommend(7L);
 
-        verify(backfill).ensureProfiles();
         verify(client).search("ai", null, LocalDate.now());
         ArgumentCaptor<List<StoredVenue>> captor = ArgumentCaptor.forClass(List.class);
         verify(conferences).replaceSnapshot(eq("ai"), captor.capture());
@@ -120,7 +118,6 @@ class ConferenceServiceTest {
         assertTrue(service.recommend(7L).isEmpty());
 
         verifyNoInteractions(client, conferences, embeddings);
-        verify(backfill).ensureProfiles();
     }
 
     @Test void propagatesApiFailureAsExternalServiceError() {
