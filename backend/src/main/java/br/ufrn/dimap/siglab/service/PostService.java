@@ -3,185 +3,100 @@ package br.ufrn.dimap.siglab.service;
 import br.ufrn.dimap.siglab.dto.CreatePostRequestDTO;
 import br.ufrn.dimap.siglab.dto.UpdatePostRequestDTO;
 import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
+import br.ufrn.dimap.siglab.exception.AccessDeniedException;
 import br.ufrn.dimap.siglab.model.Post;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.model.User_ResearchGroup;
 import br.ufrn.dimap.siglab.model.User_ResearchGroupId;
-import br.ufrn.dimap.siglab.repository.PostRepository;
-import br.ufrn.dimap.siglab.repository.ResearchGroupRepository;
-import br.ufrn.dimap.siglab.repository.UserRepository;
-import br.ufrn.dimap.siglab.repository.User_ResearchGroupRepository;
+import br.ufrn.dimap.siglab.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 @Service
 public class PostService {
-
-    private final PostRepository postRepository;
-    private final ResearchGroupRepository researchGroupRepository;
-    private final UserRepository userRepository;
-    private final User_ResearchGroupRepository userResearchGroupRepository;
-
-    public PostService(PostRepository postRepository,
-                       ResearchGroupRepository researchGroupRepository,
-                       UserRepository userRepository,
-                       User_ResearchGroupRepository userResearchGroupRepository) {
-        this.postRepository = postRepository;
-        this.researchGroupRepository = researchGroupRepository;
-        this.userRepository = userRepository;
-        this.userResearchGroupRepository = userResearchGroupRepository;
+    private final PostRepository posts;
+    private final ResearchGroupRepository groups;
+    private final UserRepository users;
+    private final User_ResearchGroupRepository memberships;
+    private final IndexingQueue indexing;
+    private final PostLikeRepository likes;
+    public PostService(PostRepository posts, ResearchGroupRepository groups, UserRepository users,
+                       User_ResearchGroupRepository memberships, IndexingQueue indexing, PostLikeRepository likes) {
+        this.posts=posts; this.groups=groups; this.users=users; this.memberships=memberships;
+        this.indexing=indexing; this.likes=likes;
     }
-
-    /**
-     * Lista os posts de um grupo de pesquisa do mais recente para o mais antigo.
-     * Disponível para qualquer usuário cadastrado no sistema.
-     *
-     * @param idGrupo o identificador do grupo de pesquisa
-     * @param requesterEmail o e-mail do solicitante
-     * @return a lista de posts do grupo
-     */
-    @Transactional(readOnly = true)
-    public List<Post> listar(String idGrupo, String requesterEmail) {
-        validarGrupo(idGrupo);
-        validarLeitor(requesterEmail);
-        return postRepository.findByGroupIdOrderByCreatedAtDesc(idGrupo);
+    @Transactional(readOnly=true)
+    public List<Post> listar(String groupId, String email) {
+        checkGroup(groupId); checkReader(email);
+        return posts.findByGroupIdOrderByCreatedAtDesc(groupId);
     }
-
-    /**
-     * Busca um post pertencente ao grupo de pesquisa informado.
-     *
-     * @param idGrupo o identificador do grupo de pesquisa
-     * @param postId o identificador do post
-     * @param requesterEmail o e-mail do solicitante
-     * @return o post encontrado
-     */
-    @Transactional(readOnly = true)
-    public Post buscar(String idGrupo, Long postId, String requesterEmail) {
-        validarGrupo(idGrupo);
-        validarLeitor(requesterEmail);
-        return buscarPostDoGrupo(postId, idGrupo);
+    @Transactional(readOnly=true)
+    public Post buscar(String groupId, Long id, String email) {
+        checkGroup(groupId); checkReader(email);
+        return post(groupId,id);
     }
-
-    /**
-     * Publica um novo post no grupo de pesquisa (Apenas Líder).
-     * O publicador é sempre o solicitante identificado pelo header de requisição.
-     *
-     * @param idGrupo o identificador do grupo de pesquisa
-     * @param requesterEmail o e-mail do líder solicitante
-     * @param request o corpo da requisição com os dados do post
-     * @return o post publicado
-     */
     @Transactional
-    public Post criar(String idGrupo, String requesterEmail, CreatePostRequestDTO request) {
-        validarGrupo(idGrupo);
-        validarLider(idGrupo, requesterEmail);
-
-        User publisher = userRepository.findByEmail(requesterEmail.trim())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Usuário publicador não encontrado com o e-mail: " + requesterEmail));
-
-        Post post = Post.builder()
-                .groupId(idGrupo)
-                .publisherUserId(publisher.getId())
-                .title(request.getTitle().trim())
-                .description(request.getDescription())
-                .content(request.getContent())
-                .tags(request.getTags())
-                .filePath(request.getFilePath())
-                .createdAt(LocalDateTime.now())
-                .build();
-
-        return postRepository.save(post);
+    public Post criar(String groupId, String email, CreatePostRequestDTO request) {
+        User publisher = checkLeader(groupId,email);
+        String[] terms=terms(request.getPostType(), request.getKeywords());
+        Post saved=posts.save(Post.builder().groupId(groupId).publisherUserId(publisher.getId())
+                .title(request.getTitle().trim()).description(request.getDescription()).content(request.getContent())
+                .tags(request.getTags()).filePath(request.getFilePath()).postType(request.getPostType().toUpperCase())
+                .keywords(terms).createdAt(LocalDateTime.now()).build());
+        indexing.enqueue("POST", saved.getId().toString());
+        return saved;
     }
-
-    /**
-     * Atualiza um post existente do grupo de pesquisa (Apenas Líder).
-     *
-     * @param idGrupo o identificador do grupo de pesquisa
-     * @param postId o identificador do post
-     * @param requesterEmail o e-mail do líder solicitante
-     * @param request o corpo da requisição com os novos dados do post
-     * @return o post atualizado
-     */
     @Transactional
-    public Post atualizar(String idGrupo, Long postId, String requesterEmail, UpdatePostRequestDTO request) {
-        validarGrupo(idGrupo);
-        validarLider(idGrupo, requesterEmail);
-
-        Post post = buscarPostDoGrupo(postId, idGrupo);
-        post.setTitle(request.getTitle().trim());
-        post.setDescription(request.getDescription());
-        post.setContent(request.getContent());
-        post.setTags(request.getTags());
-        post.setFilePath(request.getFilePath());
-
-        return postRepository.save(post);
+    public Post atualizar(String groupId, Long id, String email, UpdatePostRequestDTO request) {
+        checkLeader(groupId,email);
+        Post post=post(groupId,id);
+        String[] terms=terms(request.getPostType(),request.getKeywords());
+        post.setTitle(request.getTitle().trim()); post.setDescription(request.getDescription());
+        post.setContent(request.getContent()); post.setTags(request.getTags()); post.setFilePath(request.getFilePath());
+        post.setPostType(request.getPostType().toUpperCase()); post.setKeywords(terms);
+        Post saved=posts.save(post);
+        indexing.enqueue("POST", saved.getId().toString());
+        return saved;
     }
-
-    /**
-     * Exclui um post do grupo de pesquisa (Apenas Líder).
-     *
-     * @param idGrupo o identificador do grupo de pesquisa
-     * @param postId o identificador do post
-     * @param requesterEmail o e-mail do líder solicitante
-     */
     @Transactional
-    public void excluir(String idGrupo, Long postId, String requesterEmail) {
-        validarGrupo(idGrupo);
-        validarLider(idGrupo, requesterEmail);
-
-        postRepository.delete(buscarPostDoGrupo(postId, idGrupo));
+    public void excluir(String groupId, Long id, String email) {
+        checkLeader(groupId,email);
+        Post target=post(groupId,id);
+        List<Long> affectedUsers=likes.usersForPost(id);
+        posts.delete(target);
+        posts.flush();
+        affectedUsers.forEach(likes::refreshVector);
     }
-
-    private void validarGrupo(String idGrupo) {
-        if (!researchGroupRepository.existsById(idGrupo)) {
-            throw new ResourceNotFoundException(
-                    "Grupo de pesquisa não encontrado com o ID: " + idGrupo);
+    private String[] terms(String type, String[] supplied) {
+        if ("ARTIGO".equalsIgnoreCase(type)) {
+            if (supplied == null || supplied.length == 0) throw new IllegalArgumentException("Artigo precisa de palavras-chave.");
+            String[] clean=Arrays.stream(supplied).filter(s -> s != null && !s.isBlank()).map(String::trim)
+                    .collect(java.util.stream.Collectors.toMap(s -> s.toLowerCase(java.util.Locale.ROOT), s -> s, (a,b) -> a, java.util.LinkedHashMap::new))
+                    .values().toArray(String[]::new);
+            if (clean.length == 0) throw new IllegalArgumentException("Artigo precisa de palavras-chave.");
+            if (clean.length > 10 || Arrays.stream(clean).anyMatch(s -> s.length() > 100))
+                throw new IllegalArgumentException("Informe no máximo 10 palavras-chave de até 100 caracteres.");
+            return clean;
         }
+        if ("OUTROS".equalsIgnoreCase(type)) return new String[0];
+        throw new IllegalArgumentException("Tipo de post deve ser ARTIGO ou OUTROS.");
     }
-
-    /**
-     * Garante que o solicitante esteja logado, ou seja, possua um cadastro válido.
-     *
-     * @param requesterEmail o e-mail do solicitante
-     */
-    private void validarLeitor(String requesterEmail) {
-        if (requesterEmail == null || requesterEmail.isBlank()) {
-            throw new SecurityException(
-                    "Acesso negado: é necessário estar logado para acessar os posts do grupo.");
-        }
-        if (!userRepository.existsByEmail(requesterEmail.trim())) {
-            throw new SecurityException(
-                    "Acesso negado: o solicitante não possui um cadastro válido no sistema.");
-        }
+    private void checkGroup(String groupId) {
+        if (!groups.existsById(groupId)) throw new ResourceNotFoundException("Grupo não encontrado: " + groupId);
     }
-
-    /**
-     * Garante que o solicitante seja líder do grupo de pesquisa informado.
-     *
-     * @param idGrupo o identificador do grupo de pesquisa
-     * @param requesterEmail o e-mail do líder solicitante
-     */
-    private void validarLider(String idGrupo, String requesterEmail) {
-        validarLeitor(requesterEmail);
-
-        User_ResearchGroupId requesterId = new User_ResearchGroupId(requesterEmail.trim(), idGrupo);
-        boolean isLeader = userResearchGroupRepository.findById(requesterId)
-                .map(User_ResearchGroup::isLeader)
-                .orElse(false);
-
-        if (!isLeader) {
-            throw new SecurityException(
-                    "Acesso negado: apenas líderes do grupo podem gerenciar posts.");
-        }
+    private void checkReader(String email) {
+        if (email == null || !users.existsByEmail(email)) throw new AccessDeniedException("Entre para acessar os posts.");
     }
-
-    private Post buscarPostDoGrupo(Long postId, String idGrupo) {
-        return postRepository.findByIdAndGroupId(postId, idGrupo)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Post não encontrado no grupo informado com o ID: " + postId));
+    private User checkLeader(String groupId, String email) {
+        checkGroup(groupId); checkReader(email);
+        boolean leader=memberships.findById(new User_ResearchGroupId(email,groupId)).map(User_ResearchGroup::isLeader).orElse(false);
+        if (!leader) throw new AccessDeniedException("Apenas líderes podem gerenciar posts.");
+        return users.findByEmail(email).orElseThrow();
+    }
+    private Post post(String groupId,Long id) {
+        return posts.findByIdAndGroupId(id,groupId).orElseThrow(() -> new ResourceNotFoundException("Post não encontrado no grupo."));
     }
 }

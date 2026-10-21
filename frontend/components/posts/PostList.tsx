@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { GroupBadge } from "@/components/ui/GroupBadge";
+import { PostLikeButton } from "@/components/posts/PostLikeButton";
 import type { Post } from "@/types";
 
 interface PostListProps {
@@ -62,6 +63,7 @@ export function PostList({ groupId, posts }: PostListProps) {
           {post.description && (
             <p className="text-sm text-[#333333]">{post.description}</p>
           )}
+          <div className="mt-3"><PostLikeButton postId={post.id} /></div>
         </article>
       ))}
     </div>

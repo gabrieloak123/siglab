@@ -1,16 +1,19 @@
 package br.ufrn.dimap.siglab.controller;
 
 import br.ufrn.dimap.siglab.dto.GroupMemberDTO;
+import br.ufrn.dimap.siglab.dto.CreateGroupRequest;
+import br.ufrn.dimap.siglab.dto.UpdateGroupRequest;
 import br.ufrn.dimap.siglab.dto.InviteResponseDTO;
 import br.ufrn.dimap.siglab.dto.JoinGroupRequestDTO;
 import br.ufrn.dimap.siglab.exception.ResourceNotFoundException;
+import br.ufrn.dimap.siglab.exception.AccessDeniedException;
 import br.ufrn.dimap.siglab.model.ResearchGroup;
 import br.ufrn.dimap.siglab.service.ResearchGroupService;
+import br.ufrn.dimap.siglab.service.SessionUser;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,9 +29,11 @@ import java.util.List;
 public class ResearchGroupController {
 
     private final ResearchGroupService researchGroupService;
+    private final SessionUser sessionUser;
 
-    public ResearchGroupController(ResearchGroupService researchGroupService) {
+    public ResearchGroupController(ResearchGroupService researchGroupService, SessionUser sessionUser) {
         this.researchGroupService = researchGroupService;
+        this.sessionUser = sessionUser;
     }
 
     @GetMapping
@@ -51,23 +56,6 @@ public class ResearchGroupController {
     }
 
     /**
-     * Extrai o e-mail do solicitante priorizando o contexto de segurança (SecurityContextHolder).
-     * Se o usuário estiver autenticado no Spring Security, seu identificador é utilizado;
-     * caso contrário, utiliza o valor do header 'X-Requester-Email' como fallback.
-     *
-     * @param headerEmail o e-mail informado no header da requisição (opcional)
-     * @return o e-mail do solicitante identificado
-     */
-    private String resolveRequesterEmail(String headerEmail) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated()
-                && !"anonymousUser".equals(authentication.getPrincipal())) {
-            return authentication.getName();
-        }
-        return headerEmail;
-    }
-
-    /**
      * POST /api/research-groups/{groupId}/invites - Gera um token/hash de convite para um grupo de pesquisa (Apenas Líder).
      *
      * @param groupId o ID do grupo de pesquisa
@@ -78,9 +66,9 @@ public class ResearchGroupController {
     @PostMapping("/{groupId}/invites")
     public ResponseEntity<InviteResponseDTO> createInviteToken(
             @PathVariable("groupId") String groupId,
-            @RequestHeader(value = "X-Requester-Email", required = false) String requesterEmailHeader,
+            HttpServletRequest servletRequest,
             @RequestParam(value = "expirationDays", defaultValue = "7") Integer expirationDays) {
-        String requesterEmail = resolveRequesterEmail(requesterEmailHeader);
+        String requesterEmail = sessionUser.require(servletRequest).getEmail();
         InviteResponseDTO invite = researchGroupService.generateInviteToken(groupId, requesterEmail, expirationDays);
         return ResponseEntity.status(HttpStatus.CREATED).body(invite);
     }
@@ -92,8 +80,10 @@ public class ResearchGroupController {
      * @return {@link ResponseEntity} com os dados do usuário ingressado (200 OK)
      */
     @PostMapping("/join")
-    public ResponseEntity<GroupMemberDTO> joinGroupWithToken(@Valid @RequestBody JoinGroupRequestDTO request) {
-        GroupMemberDTO member = researchGroupService.joinGroupWithToken(request.getInviteToken(), request.getUserEmail());
+    public ResponseEntity<GroupMemberDTO> joinGroupWithToken(@Valid @RequestBody JoinGroupRequestDTO request, HttpServletRequest servletRequest) {
+        String email = sessionUser.require(servletRequest).getEmail();
+        if (!email.equalsIgnoreCase(request.getUserEmail())) throw new AccessDeniedException("Convite deve ser usado pela conta autenticada.");
+        GroupMemberDTO member = researchGroupService.joinGroupWithToken(request.getInviteToken(), email);
         return ResponseEntity.ok(member);
     }
 
@@ -109,7 +99,9 @@ public class ResearchGroupController {
     public ResponseEntity<GroupMemberDTO> setGroupLeader(
             @PathVariable("groupId") String groupId,
             @PathVariable("userEmail") String userEmail,
+            HttpServletRequest servletRequest,
             @RequestParam(defaultValue = "true") boolean isLeader) {
+        researchGroupService.requireLeader(groupId, sessionUser.require(servletRequest).getEmail());
         GroupMemberDTO member = researchGroupService.setMemberLeadership(groupId, userEmail, isLeader);
         return ResponseEntity.ok(member);
     }
@@ -126,20 +118,23 @@ public class ResearchGroupController {
     public ResponseEntity<Void> removeMemberFromGroup(
             @PathVariable("groupId") String groupId,
             @PathVariable("userEmail") String userEmail,
-            @RequestHeader(value = "X-Requester-Email", required = false) String requesterEmailHeader) {
-        String requesterEmail = resolveRequesterEmail(requesterEmailHeader);
+            HttpServletRequest servletRequest) {
+        String requesterEmail = sessionUser.require(servletRequest).getEmail();
         researchGroupService.removeMemberFromGroup(groupId, userEmail, requesterEmail);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping
-    public ResponseEntity<ResearchGroup> createResearchGroup(@Valid @RequestBody ResearchGroup researchGroup) {
-        ResearchGroup createdGroup = researchGroupService.save(researchGroup);
+    public ResponseEntity<ResearchGroup> createResearchGroup(@Valid @RequestBody CreateGroupRequest body, HttpServletRequest servletRequest) {
+        ResearchGroup group = ResearchGroup.builder().group_id(body.groupId()).name(body.name().trim()).research_fields(body.researchFields()).build();
+        ResearchGroup createdGroup = researchGroupService.createForUser(group, sessionUser.require(servletRequest).getEmail());
         return ResponseEntity.status(HttpStatus.CREATED).body(createdGroup);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ResearchGroup> updateResearchGroup(@PathVariable("id") String groupId, @Valid @RequestBody ResearchGroup groupDetails) {
+    public ResponseEntity<ResearchGroup> updateResearchGroup(@PathVariable("id") String groupId, @Valid @RequestBody UpdateGroupRequest body, HttpServletRequest servletRequest) {
+        researchGroupService.requireLeader(groupId, sessionUser.require(servletRequest).getEmail());
+        ResearchGroup groupDetails = ResearchGroup.builder().name(body.name().trim()).research_fields(body.researchFields()).build();
         ResearchGroup updatedGroup = researchGroupService.update(groupId, groupDetails);
         return ResponseEntity.ok(updatedGroup);
     }
@@ -155,9 +150,9 @@ public class ResearchGroupController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteResearchGroup(
             @PathVariable("id") String groupId,
-            @RequestHeader(value = "X-Requester-Email", required = false) String requesterEmailHeader,
+            HttpServletRequest servletRequest,
             @RequestParam(value = "leaderPassword", required = false) String leaderPassword) {
-        String requesterEmail = resolveRequesterEmail(requesterEmailHeader);
+        String requesterEmail = sessionUser.require(servletRequest).getEmail();
         researchGroupService.deleteById(groupId, requesterEmail, leaderPassword);
         return ResponseEntity.noContent().build();
     }

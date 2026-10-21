@@ -14,18 +14,13 @@ import {
 } from "@/components/ui/FormField";
 import { useFeedback } from "@/hooks/useFeedback";
 import { parseList } from "@/lib/utils";
+import type { PostPayload } from "@/lib/api";
 import type { Post } from "@/types";
 
 interface PostEditorProps {
   post?: Post;
   submitLabel: string;
-  onSubmit: (payload: {
-    title: string;
-    description: string | null;
-    content: string;
-    tags: string[];
-    filePath: string | null;
-  }) => Promise<boolean>;
+  onSubmit: (payload: PostPayload) => Promise<boolean>;
   onCancel?: () => void;
 }
 
@@ -39,6 +34,8 @@ export function PostEditor({
   const [title, setTitle] = useState(post?.title ?? "");
   const [description, setDescription] = useState(post?.description ?? "");
   const [tags, setTags] = useState((post?.tags ?? []).join(", "));
+  const [postType, setPostType] = useState<"ARTIGO" | "OUTROS">(post?.postType ?? "OUTROS");
+  const [keywords, setKeywords] = useState((post?.keywords ?? []).join(", "));
   const [file, setFile] = useState<MarkdownFile | null>(
     post?.content
       ? { fileName: post.filePath ?? "post.md", content: post.content }
@@ -54,6 +51,10 @@ export function PostEditor({
       );
       return;
     }
+    if (postType === "ARTIGO" && parseList(keywords).length === 0) {
+      feedback.fail("Informe as palavras-chave do artigo.");
+      return;
+    }
 
     feedback.begin();
 
@@ -63,6 +64,8 @@ export function PostEditor({
       content: file.content,
       tags: parseList(tags),
       filePath: file.fileName,
+      postType,
+      keywords: postType === "ARTIGO" ? parseList(keywords) : [],
     });
 
     if (saved) {
@@ -90,6 +93,15 @@ export function PostEditor({
           className={inputClassName}
         />
       </FormField>
+      <FormField label="Tipo do post">
+        <select value={postType} onChange={(event) => setPostType(event.target.value as "ARTIGO" | "OUTROS")} className={inputClassName}>
+          <option value="OUTROS">Outros</option>
+          <option value="ARTIGO">Artigo</option>
+        </select>
+      </FormField>
+      {postType === "ARTIGO" && <FormField label="Palavras-chave do artigo (separadas por vírgula)">
+        <input required value={keywords} onChange={(event) => setKeywords(event.target.value)} className={inputClassName} />
+      </FormField>}
 
       <FormField label="Descrição (resumo opcional)">
         <textarea

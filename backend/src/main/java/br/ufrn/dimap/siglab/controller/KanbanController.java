@@ -1,10 +1,16 @@
 package br.ufrn.dimap.siglab.controller;
 
+import br.ufrn.dimap.siglab.exception.AccessDeniedException;
+
 import br.ufrn.dimap.siglab.dto.CreateTarefaRequestDTO;
 import br.ufrn.dimap.siglab.dto.MoveTarefaRequestDTO;
 import br.ufrn.dimap.siglab.dto.UpdateTarefaRequestDTO;
 import br.ufrn.dimap.siglab.model.Estado;
 import br.ufrn.dimap.siglab.model.Tarefa;
+import br.ufrn.dimap.siglab.model.User;
+import br.ufrn.dimap.siglab.service.SessionUser;
+import br.ufrn.dimap.siglab.repository.User_ResearchGroupRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import br.ufrn.dimap.siglab.service.EstadoService;
 import br.ufrn.dimap.siglab.service.TarefaService;
 import jakarta.validation.Valid;
@@ -28,30 +34,45 @@ public class KanbanController {
 
     private final EstadoService estadoService;
     private final TarefaService tarefaService;
+    private final SessionUser sessionUser;
+    private final User_ResearchGroupRepository memberships;
 
-    public KanbanController(EstadoService estadoService, TarefaService tarefaService) {
+    public KanbanController(EstadoService estadoService, TarefaService tarefaService, SessionUser sessionUser,
+                            User_ResearchGroupRepository memberships) {
         this.estadoService = estadoService;
         this.tarefaService = tarefaService;
+        this.sessionUser = sessionUser;
+        this.memberships = memberships;
+    }
+
+    private User requireMember(String groupId, HttpServletRequest request) {
+        User user = sessionUser.require(request);
+        if (!memberships.existsMemberByUserIdAndGroupId(user.getId(), groupId))
+            throw new AccessDeniedException("Apenas membros podem acessar o quadro do grupo.");
+        return user;
     }
 
     @GetMapping("/board")
-    public ResponseEntity<Estado> buscarEstado(@PathVariable String groupId) {
+    public ResponseEntity<Estado> buscarEstado(@PathVariable String groupId, HttpServletRequest request) {
+        requireMember(groupId, request);
         return ResponseEntity.ok(estadoService.buscarPorGrupo(groupId));
     }
 
     @PostMapping("/tasks")
     public ResponseEntity<Tarefa> criarTarefa(
             @PathVariable String groupId,
-            @Valid @RequestBody CreateTarefaRequestDTO request) {
+            @Valid @RequestBody CreateTarefaRequestDTO request, HttpServletRequest servletRequest) {
+        User user = requireMember(groupId, servletRequest);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(tarefaService.criar(groupId, request));
+                .body(tarefaService.criar(groupId, user.getId(), request));
     }
 
     @PutMapping("/tasks/{taskId}")
     public ResponseEntity<Tarefa> atualizarTarefa(
             @PathVariable String groupId,
             @PathVariable Long taskId,
-            @Valid @RequestBody UpdateTarefaRequestDTO request) {
+            @Valid @RequestBody UpdateTarefaRequestDTO request, HttpServletRequest servletRequest) {
+        requireMember(groupId, servletRequest);
         return ResponseEntity.ok(tarefaService.atualizar(groupId, taskId, request));
     }
 
@@ -59,14 +80,16 @@ public class KanbanController {
     public ResponseEntity<Tarefa> moverTarefa(
             @PathVariable String groupId,
             @PathVariable Long taskId,
-            @Valid @RequestBody MoveTarefaRequestDTO request) {
+            @Valid @RequestBody MoveTarefaRequestDTO request, HttpServletRequest servletRequest) {
+        requireMember(groupId, servletRequest);
         return ResponseEntity.ok(tarefaService.mover(groupId, taskId, request));
     }
 
     @DeleteMapping("/tasks/{taskId}")
     public ResponseEntity<Void> excluirTarefa(
             @PathVariable String groupId,
-            @PathVariable Long taskId) {
+            @PathVariable Long taskId, HttpServletRequest request) {
+        requireMember(groupId, request);
         tarefaService.excluir(groupId, taskId);
         return ResponseEntity.noContent().build();
     }
