@@ -21,10 +21,11 @@ public class PostService {
     private final UserRepository users;
     private final User_ResearchGroupRepository memberships;
     private final IndexingQueue indexing;
+    private final PostLikeRepository likes;
     public PostService(PostRepository posts, ResearchGroupRepository groups, UserRepository users,
-                       User_ResearchGroupRepository memberships, IndexingQueue indexing) {
+                       User_ResearchGroupRepository memberships, IndexingQueue indexing, PostLikeRepository likes) {
         this.posts=posts; this.groups=groups; this.users=users; this.memberships=memberships;
-        this.indexing=indexing;
+        this.indexing=indexing; this.likes=likes;
     }
     @Transactional(readOnly=true)
     public List<Post> listar(String groupId, String email) {
@@ -62,7 +63,11 @@ public class PostService {
     @Transactional
     public void excluir(String groupId, Long id, String email) {
         checkLeader(groupId,email);
-        posts.delete(post(groupId,id));
+        Post target=post(groupId,id);
+        List<Long> affectedUsers=likes.usersForPost(id);
+        posts.delete(target);
+        posts.flush();
+        affectedUsers.forEach(likes::refreshVector);
     }
     private String[] terms(String type, String[] supplied) {
         if ("ARTIGO".equalsIgnoreCase(type)) {

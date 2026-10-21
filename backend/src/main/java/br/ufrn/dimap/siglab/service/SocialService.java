@@ -6,6 +6,7 @@ import br.ufrn.dimap.siglab.model.Post;
 import br.ufrn.dimap.siglab.model.ResearchGroup;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.repository.*;
+import br.ufrn.dimap.siglab.integration.EmbeddingProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,11 +19,13 @@ public class SocialService {
     private final PostRepository posts;
     private final VectorRepository vectors;
     private final FollowRepository follows;
+    private final PostLikeRepository likes;
+    private final EmbeddingProvider embeddings;
     private final double maxFollowedDistance;
     public SocialService(UserRepository users, ResearchGroupRepository groups, PostRepository posts,
-                         VectorRepository vectors, FollowRepository follows,
+                         VectorRepository vectors, FollowRepository follows, PostLikeRepository likes, EmbeddingProvider embeddings,
                          @Value("${RECOMMENDATION_MAX_DISTANCE:0.65}") double maxFollowedDistance) {
-        this.users=users; this.groups=groups; this.posts=posts; this.vectors=vectors; this.follows=follows;
+        this.users=users; this.groups=groups; this.posts=posts; this.vectors=vectors; this.follows=follows; this.likes=likes; this.embeddings=embeddings;
         this.maxFollowedDistance=maxFollowedDistance;
     }
     public Long userId(Object value) {
@@ -30,10 +33,21 @@ public class SocialService {
         return id;
     }
     @Transactional
-    public void followResearcher(Long me, Long target) {
+    public void followResearcher(Long me, Long target, String[] requestedAreas) {
         if (me.equals(target)) throw new IllegalArgumentException("Não é possível seguir a si mesmo.");
-        if (!users.existsById(target)) throw new ResourceNotFoundException("Pesquisador não encontrado.");
-        follows.researcher(me, target);
+        User researcher=users.findById(target).orElseThrow(() -> new ResourceNotFoundException("Pesquisador não encontrado."));
+        String[] areas=validateFollowAreas(requestedAreas, researcher.getInterest_areas());
+        follows.researcher(me, target, areas, areas == null ? null : embeddings.embed(String.join(", ", areas)));
+    }
+    private String[] validateFollowAreas(String[] requested, String[] available) {
+        if (requested == null || requested.length == 0) return null;
+        var valid=java.util.Arrays.stream(available == null ? new String[0] : available)
+                .collect(java.util.stream.Collectors.toMap(a -> a.trim().toLowerCase(java.util.Locale.ROOT), String::trim, (a,b)->a));
+        var selected=java.util.Arrays.stream(requested).filter(java.util.Objects::nonNull).map(String::trim).filter(a -> !a.isBlank())
+                .map(a -> valid.get(a.toLowerCase(java.util.Locale.ROOT))).filter(java.util.Objects::nonNull).distinct().toArray(String[]::new);
+        if (selected.length == 0 || selected.length != java.util.Arrays.stream(requested).filter(java.util.Objects::nonNull).map(String::trim).filter(a -> !a.isBlank()).distinct().count())
+            throw new IllegalArgumentException("Selecione somente áreas de interesse do pesquisador.");
+        return selected;
     }
     @Transactional
     public void followGroup(Long me, String target) {
@@ -52,5 +66,26 @@ public class SocialService {
     @Transactional(readOnly = true)
     public List<Post> recentPosts() { return posts.findTop5ByOrderByCreatedAtDesc(); }
     public List<Long> followedResearchers(Long me) { return follows.researchers(me); }
+    public List<FollowRepository.ResearcherFollow> researcherFollows(Long me) { return follows.researcherFollows(me); }
     public List<String> followedGroups(Long me) { return follows.groups(me); }
+    public record PostLike(boolean liked, long count) {}
+    @Transactional(readOnly = true)
+    public PostLike postLike(Long me, Long postId) {
+        if (!posts.existsById(postId)) throw new ResourceNotFoundException("Post não encontrado.");
+        return new PostLike(likes.liked(me, postId), likes.count(postId));
+    }
+    @Transactional
+    public PostLike likePost(Long me, Long postId) {
+        if (!posts.existsById(postId)) throw new ResourceNotFoundException("Post não encontrado.");
+        likes.like(me, postId);
+        likes.refreshVector(me);
+        return new PostLike(true, likes.count(postId));
+    }
+    @Transactional
+    public PostLike unlikePost(Long me, Long postId) {
+        if (!posts.existsById(postId)) throw new ResourceNotFoundException("Post não encontrado.");
+        likes.unlike(me, postId);
+        likes.refreshVector(me);
+        return new PostLike(false, likes.count(postId));
+    }
 }

@@ -22,8 +22,9 @@ class PostServiceTest {
     @Mock UserRepository users;
     @Mock User_ResearchGroupRepository memberships;
     @Mock IndexingQueue indexing;
+    @Mock PostLikeRepository likes;
     PostService service;
-    @BeforeEach void setup() { service=new PostService(posts,groups,users,memberships,indexing); }
+    @BeforeEach void setup() { service=new PostService(posts,groups,users,memberships,indexing,likes); }
 
     private void leader() {
         when(groups.existsById("lab")).thenReturn(true);

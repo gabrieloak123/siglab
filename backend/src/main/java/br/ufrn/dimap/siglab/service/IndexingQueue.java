@@ -4,6 +4,7 @@ import br.ufrn.dimap.siglab.integration.EmbeddingProvider;
 import br.ufrn.dimap.siglab.integration.KeywordExtractor;
 import br.ufrn.dimap.siglab.model.Post;
 import br.ufrn.dimap.siglab.repository.PostRepository;
+import br.ufrn.dimap.siglab.repository.PostLikeRepository;
 import br.ufrn.dimap.siglab.repository.ResearchGroupRepository;
 import br.ufrn.dimap.siglab.repository.UserRepository;
 import br.ufrn.dimap.siglab.repository.VectorRepository;
@@ -28,12 +29,14 @@ public class IndexingQueue {
     private final VectorRepository vectors;
     private final EmbeddingProvider embeddings;
     private final KeywordExtractor keywords;
+    private final PostLikeRepository likes;
 
     public IndexingQueue(JdbcTemplate jdbc, TransactionTemplate transaction, UserRepository users,
                          ResearchGroupRepository groups, PostRepository posts, VectorRepository vectors,
-                         EmbeddingProvider embeddings, KeywordExtractor keywords) {
+                         EmbeddingProvider embeddings, KeywordExtractor keywords,
+                         PostLikeRepository likes) {
         this.jdbc = jdbc; this.transaction = transaction; this.users = users; this.groups = groups;
-        this.posts = posts; this.vectors = vectors; this.embeddings = embeddings; this.keywords = keywords;
+        this.posts = posts; this.vectors = vectors; this.embeddings = embeddings; this.keywords = keywords; this.likes = likes;
     }
 
     /** Deve ser chamado na mesma transação que salva a entidade. */
@@ -50,6 +53,7 @@ public class IndexingQueue {
               status='PENDING', attempts=0, available_at=now(), lease_until=NULL
             """, type, id);
         jdbc.update(deleteSql, id);
+        if ("POST".equals(type)) likes.refreshVectorsForPost(Long.valueOf(id));
     }
 
     /** Descobre dados legados e seeds sem vetor, sem reabrir trabalhos que falharam. */
@@ -136,6 +140,7 @@ public class IndexingQueue {
                         posts.save(post);
                     });
                     vectors.post(Long.valueOf(job.id()), prepared.vector());
+                    likes.refreshVectorsForPost(Long.valueOf(job.id()));
                 }
                 default -> throw new IllegalArgumentException("Tipo de indexação inválido.");
             }

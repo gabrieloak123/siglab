@@ -90,6 +90,8 @@ public class UserService {
     @Transactional
     public User save(User user) {
         if (user.getAuthorId() != null && !user.getAuthorId().isBlank()) {
+            if (!"ORCID".equals(user.getVerificationLevel()))
+                throw new SecurityException("Vincule o ORCID antes de informar o author_id.");
             user.setAuthorId(user.getAuthorId().trim());
             if (userRepository.existsByAuthorId(user.getAuthorId())) throw new ConflictException("author_id já cadastrado.");
         } else {
@@ -124,8 +126,10 @@ public class UserService {
         User current = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o ID: " + id));
         String authorId = userDetails.authorId() == null || userDetails.authorId().isBlank() ? null : userDetails.authorId().trim();
-        boolean scholarChanged = authorId != null && !authorId.equals(current.getAuthorId());
-        String[] areas = scholarChanged ? interests.withScholar(authorId, userDetails.interestAreas()) : interests.three(userDetails.interestAreas());
+        boolean scholarChanged = !java.util.Objects.equals(authorId, current.getAuthorId());
+        if (scholarChanged && authorId != null && !"ORCID".equals(current.getVerificationLevel()))
+            throw new SecurityException("Vincule o ORCID antes de informar o author_id.");
+        String[] areas = interests.three(userDetails.interestAreas());
         return transaction.execute(status -> {
                     User user = userRepository.findById(id)
                             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o ID: " + id));

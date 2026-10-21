@@ -3,41 +3,33 @@ package br.ufrn.dimap.siglab.service;
 import br.ufrn.dimap.siglab.dto.GoogleLoginRequest;
 import br.ufrn.dimap.siglab.dto.RegistrationRequest;
 import br.ufrn.dimap.siglab.dto.GooglePreviewResponse;
-import br.ufrn.dimap.siglab.dto.ScholarCandidate;
 import br.ufrn.dimap.siglab.integration.GoogleIdentityProvider;
-import br.ufrn.dimap.siglab.integration.ResearchProfileProvider;
-import br.ufrn.dimap.siglab.exception.ExternalServiceException;
 import br.ufrn.dimap.siglab.exception.AuthenticationRequiredException;
 import br.ufrn.dimap.siglab.exception.ConflictException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 @Service
 public class AuthService {
-    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     private final UserRepository users;
     private final UserService userService;
     private final InterestService interests;
     private final GoogleIdentityProvider google;
     private final PasswordEncoder encoder;
-    private final ResearchProfileProvider scholar;
 
     public AuthService(UserRepository users, UserService userService, InterestService interests,
-                       GoogleIdentityProvider google, PasswordEncoder encoder, ResearchProfileProvider scholar) {
-        this.users=users; this.userService=userService; this.interests=interests; this.google=google; this.encoder=encoder; this.scholar=scholar;
+                       GoogleIdentityProvider google, PasswordEncoder encoder) {
+        this.users=users; this.userService=userService; this.interests=interests; this.google=google; this.encoder=encoder;
     }
     public User register(RegistrationRequest request) {
-        String authorId = normalizedAuthorId(request.authorId());
-        if (authorId != null && users.existsByAuthorId(authorId)) throw new ConflictException("author_id já cadastrado.");
-        String[] areas = areas(request.authorId(), request.interestAreas());
+        if (request.authorId() != null && !request.authorId().isBlank())
+            throw new IllegalArgumentException("Vincule o ORCID antes de informar o author_id.");
+        String[] areas = interests.three(request.interestAreas());
         User user = userService.save(User.builder().name(request.name().trim()).email(request.email().trim())
-                .password(request.password()).authorId(authorId).interest_areas(areas).build());
+                .password(request.password()).interest_areas(areas).build());
         return user;
     }
     public User login(String email, String password) {
@@ -50,12 +42,12 @@ public class AuthService {
         return users.findByGoogleSubject(identity.subject()).orElseGet(() -> {
             if (users.existsByEmailIgnoreCase(identity.email()))
                 throw new ConflictException("Já existe uma conta com este e-mail. Entre com senha antes de vincular Google.");
-            String authorId = normalizedAuthorId(request.authorId());
-            if (authorId != null && users.existsByAuthorId(authorId)) throw new ConflictException("author_id já cadastrado.");
-            String[] areas = areas(request.authorId(), request.interestAreas());
-            String level=verificationLevel(identity, authorId);
+            if (request.authorId() != null && !request.authorId().isBlank())
+                throw new IllegalArgumentException("Vincule o ORCID antes de informar o author_id.");
+            String[] areas = interests.three(request.interestAreas());
+            String level=identity.hostedDomain() == null || identity.hostedDomain().isBlank() ? "NAO_VERIFICADO" : "INSTITUCIONAL";
             User created = userService.save(User.builder().name(identity.name()).email(identity.email())
-                    .password(UUID.randomUUID().toString()).authorId(authorId)
+                    .password(UUID.randomUUID().toString())
                     .googleSubject(identity.subject()).institutionalDomain(identity.hostedDomain())
                     .verificationLevel(level).interest_areas(areas).build());
             return created;
@@ -64,10 +56,7 @@ public class AuthService {
     public GooglePreviewResponse previewGoogle(String credential) {
         var identity=google.verify(credential);
         boolean existing=users.findByGoogleSubject(identity.subject()).isPresent();
-        java.util.List<ScholarCandidate> candidates=java.util.List.of();
-        if (!existing) try { candidates=scholar.searchProfiles(identity.name()); }
-        catch (ExternalServiceException ex) { log.warn("Busca opcional de perfis Scholar indisponível: {}", ex.getMessage()); }
-        return new GooglePreviewResponse(existing, identity.name(), identity.email(), identity.hostedDomain(), candidates);
+        return new GooglePreviewResponse(existing, identity.name(), identity.email(), identity.hostedDomain());
     }
     public User linkGoogle(User current, String credential) {
         var identity = google.verify(credential);
@@ -81,19 +70,5 @@ public class AuthService {
         if (!"ORCID".equals(current.getVerificationLevel()) && identity.hostedDomain() != null && !identity.hostedDomain().isBlank())
             current.setVerificationLevel("INSTITUCIONAL");
         return users.save(current);
-    }
-    public String[] areas(String authorId, String[] extra) {
-        String normalized = normalizedAuthorId(authorId);
-        return normalized == null ? interests.three(extra) : interests.withScholar(normalized, extra);
-    }
-
-    private String normalizedAuthorId(String authorId) {
-        return authorId == null || authorId.isBlank() ? null : authorId.trim();
-    }
-    private String verificationLevel(GoogleIdentityProvider.Identity identity, String authorId) {
-        if (identity.hostedDomain() == null || identity.hostedDomain().isBlank()) return "NAO_VERIFICADO";
-        if (authorId == null) return "INSTITUCIONAL";
-        ScholarCandidate profile=scholar.profile(authorId);
-        return identity.hostedDomain().equalsIgnoreCase(profile.verifiedDomain()) ? "INSTITUCIONAL" : "NAO_VERIFICADO";
     }
 }
