@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { groupsApi, messageOf } from "@/lib/api";
+import { ApiError, groupsApi, messageOf } from "@/lib/api";
 import { readStoredUser } from "@/lib/storage";
 import type { GroupMember, ResearchGroup, User } from "@/types";
 
@@ -30,14 +30,14 @@ export const useGroupArea = (groupId: string): GroupArea => {
     try {
       const stored = readStoredUser();
       setUser(stored);
-      if (!stored) return;
 
-      const [groups, groupMembers] = await Promise.all([
-        groupsApi.list(),
+      // Grupo e membros são endpoints públicos: carregamos ambos também para
+      // visitantes anônimos, que podem consultar os posts do grupo.
+      const [current, groupMembers] = await Promise.all([
+        groupsApi.get(groupId),
         groupsApi.members(groupId),
       ]);
 
-      const current = groups.find((item) => item.group_id === groupId) ?? null;
       if (!current) {
         setError("Grupo de pesquisa não encontrado.");
         return;
@@ -47,10 +47,12 @@ export const useGroupArea = (groupId: string): GroupArea => {
       setMembers(groupMembers);
     } catch (caught) {
       setError(
-        messageOf(caught, {
-          api: "Não foi possível carregar os dados do grupo de pesquisa.",
-          network: "Falha de conexão com o servidor.",
-        })
+        caught instanceof ApiError && caught.status === 404
+          ? "Grupo de pesquisa não encontrado."
+          : messageOf(caught, {
+              api: "Não foi possível carregar os dados do grupo de pesquisa.",
+              network: "Falha de conexão com o servidor.",
+            })
       );
     } finally {
       setLoading(false);

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -27,36 +28,51 @@ export default function GroupPostsPage() {
     );
   }
 
-  if (!area.user) {
-    return (
-      <main className="flex-1 max-w-4xl w-full mx-auto p-6">
-        <h1 className="text-xl font-bold text-[#333333] mb-2">
-          Entre para acessar os posts
-        </h1>
-        <p className="text-sm text-gray-600">
-          Sua sessão não foi encontrada. Faça login para ler os posts deste grupo.
-        </p>
-      </main>
-    );
-  }
-
   if (!area.group) {
     return (
       <main className="flex-1 max-w-4xl w-full mx-auto p-6">
         <h1 className="text-xl font-bold text-[#333333] mb-2">
           Grupo indisponível
         </h1>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-600 mb-4">
           {area.error || "Grupo de pesquisa não encontrado."}
         </p>
+        <Link href="/" className="btn-dark text-sm">
+          Voltar para a página inicial
+        </Link>
       </main>
     );
   }
 
+  const isAnonymous = !area.user;
+
   return (
     <main className="flex-1 max-w-4xl w-full mx-auto p-6">
+      {isAnonymous && (
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <Link
+            href="/"
+            className="text-sm text-green-700 font-semibold hover:underline"
+          >
+            ← Voltar para a página inicial
+          </Link>
+          <Link href="/?descoberta=1" className="btn-green text-sm">
+            Entrar / Cadastrar-se
+          </Link>
+        </div>
+      )}
+
       <GroupAreaHeader group={area.group} isLeader={area.isLeader} />
-      <GroupNavigation groupId={groupId} active="posts" isLeader={area.isLeader} />
+      {!isAnonymous && (
+        <GroupNavigation groupId={groupId} active="posts" isLeader={area.isLeader} />
+      )}
+
+      {isAnonymous && (
+        <p className="mb-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-[#333333]">
+          Você está navegando como visitante. Faça login para curtir e publicar
+          posts neste grupo de pesquisa.
+        </p>
+      )}
 
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-bold text-[#333333]">Posts do Grupo</h2>
@@ -99,7 +115,7 @@ export default function GroupPostsPage() {
       {posts.loading ? (
         <p className="text-sm text-gray-600">Carregando posts...</p>
       ) : (
-        <PostList groupId={groupId} posts={posts.posts} />
+        <PostList groupId={groupId} posts={posts.posts} showLike={!isAnonymous} />
       )}
     </main>
   );
