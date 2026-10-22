@@ -126,7 +126,9 @@ Fornece sugestões em `/suggestions/researchers` e `/suggestions/groups`, feed e
 | `OrcidService` | Troca o código recebido com o provedor por uma identidade e vincula o ORCID ao usuário, verificando conflitos. |
 | `EstadoService` | Monta o estado do quadro a partir das colunas e tarefas; cria as colunas iniciais quando necessário. |
 | `TarefaService` | Cria, edita, move e remove tarefas, verificando vínculo com grupo, coluna e participantes conforme o caso. |
-| `PostService` | Verifica acesso e liderança, valida tipo e palavras-chave, salva publicações e solicita indexação. `ARTIGO` exige palavras-chave informadas; `OUTROS` tem palavras-chave geradas posteriormente. |
+| `PostService` | Verifica acesso e liderança, valida tipo e palavras-chave, salva publicações e solicita indexação. `ARTIGO` exige palavras-chave informadas; `OUTROS` tem palavras-chave geradas posteriormente. Também publica o evento de publicação que dispara a notificação dos seguidores. |
+| `FollowerNotificationService` | Monta a lista de destinatários da notificação de publicação (seguidores do grupo e do pesquisador, sem duplicatas e sem o autor), aplica o filtro de áreas de interesse e envia um e-mail em texto puro por destinatário. Falhas individuais são registradas em log e não interrompem os demais envios. |
+| `PostPublishedListener` | Escuta o evento de publicação após o commit da transação e delega a notificação em execução assíncrona, para que a resposta HTTP não dependa do servidor SMTP. |
 | `SocialService` | Gerencia seguimentos, consulta recomendações e feed, e retorna publicações recentes. |
 | `IndexingQueue` | Mantém trabalhos persistidos, descobre vetores ausentes, executa indexação em segundo plano e controla tentativas, versões e concessão temporária do trabalho. |
 | `DiscoveryService` | Valida os posts selecionados e salva, para o usuário autenticado, a média normalizada de seus vetores, separada do vetor de áreas declaradas. |
@@ -145,7 +147,7 @@ Repositórios encapsulam acesso aos dados. Os repositórios de entidades usam Sp
 | `GroupInviteRepository` | Convites persistidos por token. |
 | `PostRepository` | Publicações por grupo, id e data, inclusive as recentes. |
 | `ColunaRepository`, `TarefaRepository` | Colunas e tarefas do Kanban. |
-| `FollowRepository` | Inserção, remoção e listagem dos relacionamentos de seguir pesquisadores e grupos. |
+| `FollowRepository` | Inserção, remoção e listagem dos relacionamentos de seguir pesquisadores e grupos, inclusive a listagem de seguidores com nome, e-mail e áreas de interesse, usada nas notificações. |
 | `VectorRepository` | Escrita de vetores de 1024 dimensões, validação dos valores e consultas de similaridade no pgvector. |
 
 ### Tabelas complementares em `schema.sql`
@@ -190,6 +192,15 @@ As chamadas podem falhar por indisponibilidade, credenciais, limites de cota ou 
 4. Antes de salvar, verifica a versão do trabalho. Se o conteúdo tiver sido alterado durante a chamada, o resultado antigo não substitui o mais novo.
 5. O vetor fica disponível para consultas semânticas. Assim, uma publicação pode existir antes de aparecer em recomendações.
 
+### Publicação e notificação de seguidores
+
+1. Ao criar um post, `PostService` publica um evento de domínio com o retrato da publicação, ainda dentro da transação.
+2. A escuta ocorre em `AFTER_COMMIT`: se a transação for revertida, nenhuma notificação é enviada.
+3. A notificação roda em execução assíncrona (`@Async`), logo após o commit, em outra thread; a resposta HTTP não espera o servidor SMTP e uma falha de envio não jeopardize a publicação.
+4. Os destinatários são os seguidores do grupo do post e os seguidores do pesquisador que publicou, sem duplicatas e sem o autor da publicação.
+5. Quem segue um pesquisador com áreas de interesse só é notificado quando o post corresponde a alguma dessas áreas: todas as palavras da área precisam aparecer como palavra inteira no título, descrição, conteúdo, palavras-chave ou etiquetas do post, ignorando maiúsculas e acentos. Quem segue sem escolher áreas recebe todas as publicações.
+6. Cada destinatário recebe um e-mail em texto puro com o grupo, o título, um excerto do post e o endereço `{APP_BASE_URL}/groups/{groupId}/posts/{postId}`. A falha de um destinatário é registrada em log e os demais continuam sendo notificados.
+
 ### Fila e recuperação
 
 Os estados usados são `PENDING`, `PROCESSING` e `ERROR`. A captura usa bloqueio SQL `SKIP LOCKED` e uma concessão de cinco minutos; falhas agendam até cinco tentativas com espera progressiva. Um processo periódico descobre registros elegíveis sem vetor, inclusive dados antigos. Trabalhos em `ERROR` não são automaticamente recriados pela descoberta; após corrigir o problema, o procedimento de reenfileiramento está no `README.md`.
@@ -232,9 +243,11 @@ O arquivo `.env-example` e o `docker-compose.yml` mostram a configuração de de
 | `GEMINI_API_KEY` | Geração de palavras-chave para posts `OUTROS`. |
 | `GOOGLE_CLIENT_ID` | Audiência esperada para credenciais Google. |
 | `ORCID_CLIENT_ID`, `ORCID_CLIENT_SECRET`, `ORCID_REDIRECT_URI`, `ORCID_BASE_URL` | Cliente, segredo, endereço de retorno e ambiente ORCID. A URL de retorno deve corresponder à cadastrada no provedor. |
-| `APP_BASE_URL` | Endereço do frontend usado no redirecionamento após o ORCID. |
+| `APP_BASE_URL` | Endereço do frontend usado no redirecionamento após o ORCID e no link do e-mail de notificação de publicação. |
 | `RECOMMENDATION_MAX_DISTANCE` | Limite de distância do feed de seguidos; padrão `0.65`. |
 | `EXTERNAL_CONNECT_TIMEOUT_MS`, `EXTERNAL_READ_TIMEOUT_MS` | Limites do `RestClient` compartilhado; padrões 5000 e 20000 ms. |
+
+O envio de e-mails usa `SMTP_USERNAME` e `SMTP_PASSWORD`, definidos em `application.properties` a partir do ambiente. A execução assíncrona das notificações é ajustada por `spring.task.execution.pool.core-size`, `spring.task.execution.pool.max-size`, `spring.task.execution.pool.queue-capacity` e `spring.task.execution.thread-name-prefix`.
 
 O código também aceita `SERPAPI_SEARCH_URL`, `GEMINI_MODEL_URL`, `CLOUDFLARE_EMBEDDING_URL` e os intervalos `INDEX_DISCOVERY_INITIAL_DELAY_MS`, `INDEX_DISCOVERY_DELAY_MS`, `INDEX_WORKER_INITIAL_DELAY_MS` e `INDEX_WORKER_DELAY_MS`. Essas opções não estão todas repassadas pelo Compose: para usá-las em contêiner, é preciso disponibilizá-las no ambiente do serviço, além de colocá-las no arquivo de variáveis. Alterar a URL/modelo de embeddings sem reindexar todos os dados pode misturar espaços semânticos incompatíveis.
 
@@ -254,5 +267,6 @@ Os testes em `src/test/java` cobrem inicialização do contexto, autenticação,
 - A autorização depende de verificações distribuídas pelo código; `permitAll` global e CSRF desabilitado exigem revisão antes de produção. HTTP Basic/formulário e as credenciais de desenvolvimento também devem ser revistos.
 - Alguns endpoints retornam entidades e a criação de usuário ainda recebe entidade diretamente. DTOs explícitos e revisão de quais campos são públicos reduziriam acoplamento e exposição acidental.
 - A fila fornece consistência eventual, não disponibilidade imediata das recomendações; falhas permanentes exigem observação e recuperação operacional.
+- A notificação de seguidores é best-effort: não há retentativa de envio, o processamento assíncrono é em memória (uma reinicialização da aplicação perde as notificações pendentes) e não existe preferência de descadastro pelo usuário. Contas gratuitas do Gmail limitam o volume diário de envios, o que restringe grupos com muitos seguidores.
 - A busca Scholar e o vínculo ORCID têm propósitos diferentes: o primeiro consulta dados públicos, o segundo comprova controle da conta autorizada. Nenhum deles garante automaticamente que todos os perfis externos representem a mesma pessoa.
 - Os testes não cobrem todos os cenários concorrentes, integrações reais ou políticas de segurança; a documentação não deve ser tratada como substituto de auditoria ou testes de ponta a ponta.

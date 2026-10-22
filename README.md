@@ -66,10 +66,13 @@ docker compose down -v
 
 ### Dados de demonstração
 
-Para substituir os dados atuais por 20 usuários, 5 grupos e 10 artigos de teste:
+Os dados de demonstração (20 usuários, 5 grupos e 10 artigos de teste) são
+carregados automaticamente na criação do banco: a pasta `db-init` é montada em
+`/docker-entrypoint-initdb.d`, e o `db-init/mock1.sql` roda depois do
+`db-init/init.sql`. Para recriá-los em um banco que já está em uso:
 
 ```bash
-docker compose exec -T db psql -v ON_ERROR_STOP=1 -U siglab -d siglab < scripts/seed-test-data.sql
+docker compose exec -T db psql -v ON_ERROR_STOP=1 -U siglab -d siglab < db-init/mock1.sql
 ```
 
 Todos os usuários de demonstração usam a senha `teste123`. O script também cria

@@ -9,6 +9,7 @@ import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.model.User_ResearchGroup;
 import br.ufrn.dimap.siglab.model.User_ResearchGroupId;
 import br.ufrn.dimap.siglab.repository.*;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
@@ -23,10 +24,12 @@ public class PostService {
     private final User_ResearchGroupRepository memberships;
     private final IndexingQueue indexing;
     private final PostLikeRepository likes;
+    private final ApplicationEventPublisher events;
     public PostService(PostRepository posts, ResearchGroupRepository groups, UserRepository users,
-                       User_ResearchGroupRepository memberships, IndexingQueue indexing, PostLikeRepository likes) {
+                       User_ResearchGroupRepository memberships, IndexingQueue indexing, PostLikeRepository likes,
+                       ApplicationEventPublisher events) {
         this.posts=posts; this.groups=groups; this.users=users; this.memberships=memberships;
-        this.indexing=indexing; this.likes=likes;
+        this.indexing=indexing; this.likes=likes; this.events=events;
     }
     @Transactional(readOnly=true)
     public List<Post> listar(String groupId, String email) {
@@ -49,6 +52,8 @@ public class PostService {
                 .tags(request.getTags()).filePath(request.getFilePath()).postType(request.getPostType().toUpperCase())
                 .keywords(terms).createdAt(LocalDateTime.now()).build());
         indexing.enqueue("POST", saved.getId().toString());
+        events.publishEvent(new PostPublishedEvent(saved.getGroupId(), saved.getId(), saved.getPublisherUserId(),
+                saved.getTitle(), saved.getDescription(), saved.getContent(), saved.getTags(), saved.getKeywords()));
         return saved;
     }
     @Transactional

@@ -1,245 +1,114 @@
 -- =====================================================================
--- DADOS MOCKADOS
--- Ordem de insercao respeita as FKs:
---   users -> research_group -> user_research_group
---   -> kanban_columns -> kanban_tasks -> posts
+-- DADOS DE DEMONSTRACAO
 --
--- Senha de TODOS os usuarios: senha123
--- (hash bcrypt $2b$10$..., compativel com BCryptPasswordEncoder do Spring)
+-- Este arquivo roda automaticamente na criacao do banco (a pasta db-init
+-- e montada em /docker-entrypoint-initdb.d), depois do init.sql.
+--
+-- Conteudo: 20 usuarios, 5 grupos de pesquisa, 10 artigos e os seguimentos
+-- entre eles. Senha de TODOS os usuarios: teste123
+-- (hash bcrypt $2y$10$..., compativel com BCryptPasswordEncoder do Spring)
+--
+-- Para recriar os dados de demonstracao em um banco que ja esta em uso:
+--   docker compose exec -T db psql -v ON_ERROR_STOP=1 -U siglab -d siglab \
+--       < db-init/mock1.sql
 -- =====================================================================
 
 BEGIN;
 
 -- ---------------------------------------------------------------------
--- (Opcional) Limpar dados existentes antes de rodar o seed.
--- Descomente se quiser recriar tudo do zero.
+-- Limpa os dados existentes. As tabelas sao montadas dinamicamente para
+-- que o script funcione tanto na criacao do banco (quando parte do schema
+-- ainda nao existe) quanto sobre um banco ja em uso.
 -- ---------------------------------------------------------------------
--- TRUNCATE posts, kanban_tasks, kanban_columns,
---          user_research_group, research_group, users
---          RESTART IDENTITY CASCADE;
+DO $$
+DECLARE
+    alvo TEXT;
+BEGIN
+    SELECT string_agg(format('%I.%I', schemaname, tablename), ', ')
+      INTO alvo
+      FROM pg_tables
+     WHERE schemaname = current_schema()
+       AND tablename IN ('indexing_jobs','post_vectors','user_vectors','group_vectors',
+                         'researcher_follows','group_follows','posts','kanban_tasks',
+                         'kanban_columns','group_invites','user_research_group',
+                         'research_group','users');
+    IF alvo IS NOT NULL THEN
+        EXECUTE 'TRUNCATE TABLE ' || alvo || ' RESTART IDENTITY CASCADE';
+    END IF;
+END $$;
 
 -- ---------------------------------------------------------------------
 -- 1. users
--- Obs: users.groups e BIGINT[], mas research_group.group_id e VARCHAR,
--- entao nao ha como guardar os ids dos grupos ali. Fica vazio; o vinculo
--- real esta em user_research_group.
+-- Os ids sao gerados pela sequence, de 1 a 20, na ordem de insercao.
 -- ---------------------------------------------------------------------
-INSERT INTO users (id, email, password, name, interest_areas, groups) VALUES
-(1,  'ana.souza@example.com',       '$2b$10$abcdefghijklmnopqrstuu4GiwOG/hJykbcxOdaNQqlq2A2t0sW0m', 'Ana Beatriz Souza',     ARRAY['Aprendizado de Máquina','Imagens Médicas','Ética em IA'],            '{}'),
-(2,  'carlos.lima@example.com',     '$2b$10$abcdefghijklmnopqrstuu4GiwOG/hJykbcxOdaNQqlq2A2t0sW0m', 'Carlos Eduardo Lima',   ARRAY['Engenharia de Software','DevOps','Aprendizado de Máquina'],          '{}'),
-(3,  'mariana.ferreira@example.com','$2b$10$abcdefghijklmnopqrstuu4GiwOG/hJykbcxOdaNQqlq2A2t0sW0m', 'Mariana Ferreira',      ARRAY['Bioinformática','Processamento de Linguagem Natural'],               '{}'),
-(4,  'rafael.oliveira@example.com', '$2b$10$abcdefghijklmnopqrstuu4GiwOG/hJykbcxOdaNQqlq2A2t0sW0m', 'Rafael Oliveira',      ARRAY['Visão Computacional','Qualidade de Software'],                       '{}'),
-(5,  'juliana.martins@example.com', '$2b$10$abcdefghijklmnopqrstuu4GiwOG/hJykbcxOdaNQqlq2A2t0sW0m', 'Juliana Martins',      ARRAY['Genômica','Bioinformática','Estatística'],                           '{}'),
-(6,  'lucas.pereira@example.com',   '$2b$10$abcdefghijklmnopqrstuu4GiwOG/hJykbcxOdaNQqlq2A2t0sW0m', 'Lucas Pereira',        ARRAY['Mineração de Repositórios','Informática na Educação'],               '{}'),
-(7,  'fernanda.costa@example.com',  '$2b$10$abcdefghijklmnopqrstuu4GiwOG/hJykbcxOdaNQqlq2A2t0sW0m', 'Fernanda Costa',       ARRAY['Redes Biológicas','Gamificação','Aprendizagem Adaptativa'],          '{}'),
-(8,  'pedro.alves@example.com',     '$2b$10$abcdefghijklmnopqrstuu4GiwOG/hJykbcxOdaNQqlq2A2t0sW0m', 'Pedro Henrique Alves', ARRAY['Genômica','Informática na Educação'],                               '{}'),
-(9,  'camila.rodrigues@example.com','$2b$10$abcdefghijklmnopqrstuu4GiwOG/hJykbcxOdaNQqlq2A2t0sW0m', 'Camila Rodrigues',     ARRAY['Gamificação','Aprendizagem Adaptativa','Design Instrucional'],       '{}'),
-(10, 'gabriel.santos@example.com',  '$2b$10$abcdefghijklmnopqrstuu4GiwOG/hJykbcxOdaNQqlq2A2t0sW0m', 'Gabriel Santos',       ARRAY['DevOps','Gamificação','Desenvolvimento Web'],                        '{}');
-
--- Ajusta a sequence do BIGSERIAL, ja que os ids foram inseridos manualmente
-SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT MAX(id) FROM users));
+INSERT INTO users (name, email, password, interest_areas, verification_level) VALUES
+('Ana Inteligência', 'ana.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Inteligência Artificial','Aprendizado de Máquina','Visão Computacional'], 'NAO_VERIFICADO'),
+('Bruno Robótica', 'bruno.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Robótica','Inteligência Artificial','Sistemas Autônomos'], 'NAO_VERIFICADO'),
+('Carla Dados', 'carla.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Ciência de Dados','Aprendizado de Máquina','Mineração de Dados'], 'NAO_VERIFICADO'),
+('Diego Visão', 'diego.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Visão Computacional','Processamento de Imagens','Inteligência Artificial'], 'NAO_VERIFICADO'),
+('Elisa Saúde', 'elisa.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Informática em Saúde','Bioinformática','Diagnóstico Assistido'], 'NAO_VERIFICADO'),
+('Felipe Bio', 'felipe.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Bioinformática','Genômica','Saúde Digital'], 'NAO_VERIFICADO'),
+('Gabriela Médica', 'gabriela.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Imagens Médicas','Diagnóstico Assistido','Saúde Digital'], 'NAO_VERIFICADO'),
+('Henrique Clínico', 'henrique.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Dados Clínicos','Informática em Saúde','Epidemiologia'], 'NAO_VERIFICADO'),
+('Isabela Ambiente', 'isabela.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Mudanças Climáticas','Sensoriamento Remoto','Sustentabilidade'], 'NAO_VERIFICADO'),
+('João Energia', 'joao.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Energia Renovável','Sustentabilidade','Otimização'], 'NAO_VERIFICADO'),
+('Karen Clima', 'karen.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Climatologia','Modelagem Ambiental','Mudanças Climáticas'], 'NAO_VERIFICADO'),
+('Lucas Oceano', 'lucas.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Oceanografia','Conservação','Sensoriamento Remoto'], 'NAO_VERIFICADO'),
+('Marina Educação', 'marina.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Tecnologia Educacional','Aprendizagem','Educação a Distância'], 'NAO_VERIFICADO'),
+('Nicolas Ensino', 'nicolas.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Metodologias Ativas','Formação Docente','Avaliação'], 'NAO_VERIFICADO'),
+('Olívia Inclusão', 'olivia.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Educação Inclusiva','Acessibilidade','Tecnologia Assistiva'], 'NAO_VERIFICADO'),
+('Paulo Jogos', 'paulo.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Jogos Educacionais','Gamificação','Aprendizagem'], 'NAO_VERIFICADO'),
+('Renata Redes', 'renata.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Redes de Computadores','Segurança','Sistemas Distribuídos'], 'NAO_VERIFICADO'),
+('Sérgio Segurança', 'sergio.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Cibersegurança','Criptografia','Privacidade'], 'NAO_VERIFICADO'),
+('Talita Nuvem', 'talita.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Computação em Nuvem','Sistemas Distribuídos','DevOps'], 'NAO_VERIFICADO'),
+('Vitor IoT', 'vitor.teste@siglab.local', '$2y$10$D7DB0PrPd.LlyFBkm.u1WO0MgnXyv6CNdDK2TWELResi4C4pTz/ka', ARRAY['Internet das Coisas','Redes de Sensores','Sistemas Embarcados'], 'NAO_VERIFICADO');
 
 -- ---------------------------------------------------------------------
 -- 2. research_group
 -- ---------------------------------------------------------------------
 INSERT INTO research_group (group_id, name, research_fields) VALUES
-('ia-saude',       'Inteligência Artificial Aplicada à Saúde',      ARRAY['Aprendizado de Máquina','Imagens Médicas','Processamento de Linguagem Natural']),
-('eng-software',   'Engenharia de Software Experimental',           ARRAY['Qualidade de Software','DevOps','Mineração de Repositórios']),
-('bioinfo',        'Bioinformática e Genômica Computacional',       ARRAY['Genômica','Bioinformática','Redes Biológicas']),
-('edu-digital',    'Tecnologias Digitais para Educação',            ARRAY['Informática na Educação','Gamificação','Aprendizagem Adaptativa']);
+('lab-ia', 'Laboratório de Inteligência Artificial', ARRAY['Inteligência Artificial','Aprendizado de Máquina','Visão Computacional']),
+('lab-saude', 'Laboratório de Saúde Digital', ARRAY['Informática em Saúde','Bioinformática','Diagnóstico Assistido']),
+('lab-ambiente', 'Laboratório de Sustentabilidade', ARRAY['Mudanças Climáticas','Sensoriamento Remoto','Sustentabilidade']),
+('lab-educacao', 'Laboratório de Educação e Tecnologia', ARRAY['Tecnologia Educacional','Aprendizagem','Educação Inclusiva']),
+('lab-redes', 'Laboratório de Redes e Segurança', ARRAY['Redes de Computadores','Cibersegurança','Sistemas Distribuídos']);
 
 -- ---------------------------------------------------------------------
 -- 3. user_research_group  (1 lider por grupo)
 -- ---------------------------------------------------------------------
 INSERT INTO user_research_group (user_email, group_id, is_leader) VALUES
--- ia-saude
-('ana.souza@example.com',        'ia-saude',     TRUE),
-('carlos.lima@example.com',      'ia-saude',     FALSE),
-('mariana.ferreira@example.com', 'ia-saude',     FALSE),
-('rafael.oliveira@example.com',  'ia-saude',     FALSE),
--- eng-software
-('carlos.lima@example.com',      'eng-software', TRUE),
-('rafael.oliveira@example.com',  'eng-software', FALSE),
-('lucas.pereira@example.com',    'eng-software', FALSE),
-('gabriel.santos@example.com',   'eng-software', FALSE),
--- bioinfo
-('juliana.martins@example.com',  'bioinfo',      TRUE),
-('mariana.ferreira@example.com', 'bioinfo',      FALSE),
-('fernanda.costa@example.com',   'bioinfo',      FALSE),
-('pedro.alves@example.com',      'bioinfo',      FALSE),
--- edu-digital
-('camila.rodrigues@example.com', 'edu-digital',  TRUE),
-('fernanda.costa@example.com',   'edu-digital',  FALSE),
-('gabriel.santos@example.com',   'edu-digital',  FALSE),
-('lucas.pereira@example.com',    'edu-digital',  FALSE),
-('pedro.alves@example.com',      'edu-digital',  FALSE);
+('ana.teste@siglab.local','lab-ia',true), ('bruno.teste@siglab.local','lab-ia',false),
+('elisa.teste@siglab.local','lab-saude',true), ('felipe.teste@siglab.local','lab-saude',false),
+('isabela.teste@siglab.local','lab-ambiente',true), ('joao.teste@siglab.local','lab-ambiente',false),
+('marina.teste@siglab.local','lab-educacao',true), ('nicolas.teste@siglab.local','lab-educacao',false),
+('renata.teste@siglab.local','lab-redes',true), ('sergio.teste@siglab.local','lab-redes',false);
 
 -- ---------------------------------------------------------------------
--- 4. kanban_columns  (4 colunas por grupo)
--- ids: ia-saude 1-4 | eng-software 5-8 | bioinfo 9-12 | edu-digital 13-16
+-- 4. posts
 -- ---------------------------------------------------------------------
-INSERT INTO kanban_columns (id, name, column_order, research_group_id) VALUES
-(1,  'A Fazer',       1, 'ia-saude'),
-(2,  'Em Andamento',  2, 'ia-saude'),
-(3,  'Em Revisão',    3, 'ia-saude'),
-(4,  'Concluído',     4, 'ia-saude'),
-
-(5,  'A Fazer',       1, 'eng-software'),
-(6,  'Em Andamento',  2, 'eng-software'),
-(7,  'Em Revisão',    3, 'eng-software'),
-(8,  'Concluído',     4, 'eng-software'),
-
-(9,  'A Fazer',       1, 'bioinfo'),
-(10, 'Em Andamento',  2, 'bioinfo'),
-(11, 'Em Revisão',    3, 'bioinfo'),
-(12, 'Concluído',     4, 'bioinfo'),
-
-(13, 'A Fazer',       1, 'edu-digital'),
-(14, 'Em Andamento',  2, 'edu-digital'),
-(15, 'Em Revisão',    3, 'edu-digital'),
-(16, 'Concluído',     4, 'edu-digital');
-
--- Ajusta a sequence da coluna IDENTITY
-SELECT setval(pg_get_serial_sequence('kanban_columns', 'id'), (SELECT MAX(id) FROM kanban_columns));
+INSERT INTO posts (group_id, publisher_user_id, title, description, content, tags, post_type, keywords, created_at) VALUES
+('lab-ia',1,'Detecção de objetos em tempo real','Novo método para detectar objetos em imagens com baixa latência.','Resumo experimental do artigo de visão computacional.',ARRAY['IA','visão'],'ARTIGO',ARRAY['visão computacional','detecção de objetos','aprendizado profundo'],now()-interval '1 day'),
+('lab-ia',2,'Robôs móveis em ambientes dinâmicos','Planejamento seguro de trajetórias para robôs autônomos.','Resultados de navegação e controle.',ARRAY['robótica'],'ARTIGO',ARRAY['robótica','planejamento','sistemas autônomos'],now()-interval '2 days'),
+('lab-saude',5,'IA no diagnóstico por imagem','Classificação de exames médicos com apoio computacional.','Estudo aplicado a imagens médicas.',ARRAY['saúde','IA'],'ARTIGO',ARRAY['imagens médicas','diagnóstico assistido','saúde digital'],now()-interval '3 days'),
+('lab-saude',6,'Genômica para medicina personalizada','Análise de variantes genéticas para apoio clínico.','Pesquisa em bioinformática e genômica.',ARRAY['bioinformática'],'ARTIGO',ARRAY['genômica','bioinformática','medicina personalizada'],now()-interval '4 days'),
+('lab-ambiente',9,'Monitoramento climático por satélite','Uso de sensoriamento remoto para acompanhar mudanças climáticas.','Resumo de dados ambientais orbitais.',ARRAY['clima'],'ARTIGO',ARRAY['mudanças climáticas','sensoriamento remoto','sustentabilidade'],now()-interval '5 days'),
+('lab-ambiente',10,'Otimização de energia solar','Modelo para melhorar a geração de energia renovável.','Análise de eficiência energética.',ARRAY['energia'],'ARTIGO',ARRAY['energia renovável','otimização','sustentabilidade'],now()-interval '6 days'),
+('lab-educacao',13,'Plataformas adaptativas de aprendizagem','Ambientes educacionais adaptados ao perfil do estudante.','Tecnologia aplicada ao ensino.',ARRAY['educação'],'ARTIGO',ARRAY['tecnologia educacional','aprendizagem','personalização'],now()-interval '7 days'),
+('lab-educacao',14,'Metodologias ativas no ensino superior','Avaliação de aprendizagem baseada em projetos.','Relato de prática docente.',ARRAY['ensino'],'ARTIGO',ARRAY['metodologias ativas','avaliação','formação docente'],now()-interval '8 days'),
+('lab-redes',17,'Detecção de intrusão em redes','Análise distribuída de tráfego para detectar ataques.','Experimentos de segurança em redes.',ARRAY['segurança'],'ARTIGO',ARRAY['cibersegurança','redes de computadores','detecção de intrusão'],now()-interval '9 days'),
+('lab-redes',18,'Privacidade em sistemas distribuídos','Protocolo criptográfico para serviços em nuvem.','Resumo sobre privacidade e criptografia.',ARRAY['privacidade'],'ARTIGO',ARRAY['criptografia','privacidade','sistemas distribuídos'],now()-interval '10 days');
 
 -- ---------------------------------------------------------------------
--- 5. kanban_tasks
--- A FK composta (column_id, group_id) exige que a coluna pertenca ao
--- mesmo grupo da tarefa. Uma tarefa sem responsavel (assigned_to_id NULL)
--- foi incluida de proposito para testar esse caso.
+-- 5. seguimentos
 -- ---------------------------------------------------------------------
-INSERT INTO kanban_tasks (group_id, created_by_id, assigned_to_id, title, description, tags, column_id) VALUES
--- ia-saude (usuarios 1, 2, 3, 4)
-('ia-saude', 1, 3, 'Revisão sistemática sobre segmentação de tomografias',
-    'Levantar artigos dos últimos 5 anos sobre segmentação de imagens de tomografia computadorizada e organizar em planilha.',
-    ARRAY['revisão','literatura'], 2),
-('ia-saude', 1, 4, 'Pré-processar dataset de radiografias de tórax',
-    'Normalizar resolução, remover duplicatas e dividir em treino, validação e teste.',
-    ARRAY['dados','pré-processamento'], 1),
-('ia-saude', 2, 2, 'Treinar baseline U-Net',
-    'Treinar o modelo de referência e registrar métricas (Dice e IoU) para comparação futura.',
-    ARRAY['modelo','experimento'], 3),
-('ia-saude', 1, NULL, 'Redigir seção de métodos do artigo',
-    'Descrever datasets, arquitetura e protocolo experimental. Ainda sem responsável.',
-    ARRAY['escrita'], 1),
-('ia-saude', 1, 1, 'Submeter protocolo ao comitê de ética',
-    'Enviar documentação completa e acompanhar o parecer.',
-    ARRAY['ética','burocracia'], 4),
+INSERT INTO researcher_follows(follower_id, followed_id) VALUES
+(1,2),(1,5),(5,6),(9,10),(13,14),(17,18),(2,3),(6,7),(10,11),(14,15);
+INSERT INTO group_follows(follower_id, group_id) VALUES
+(1,'lab-ia'),(1,'lab-saude'),(5,'lab-saude'),(9,'lab-ambiente'),
+(13,'lab-educacao'),(17,'lab-redes');
 
--- eng-software (usuarios 2, 4, 6, 10)
-('eng-software', 2, 4, 'Definir métricas de qualidade de código',
-    'Escolher conjunto de métricas (complexidade ciclomática, acoplamento, code smells) para o estudo.',
-    ARRAY['métricas','planejamento'], 5),
-('eng-software', 2, 6, 'Coletar repositórios do GitHub para análise',
-    'Selecionar repositórios por estrelas, linguagem e atividade recente.',
-    ARRAY['dados','github'], 6),
-('eng-software', 6, 10, 'Configurar pipeline de CI para os experimentos',
-    'Automatizar execução dos scripts de análise a cada push na branch principal.',
-    ARRAY['ci','devops'], 7),
-('eng-software', 2, 6, 'Escrever script de mineração de commits',
-    'Extrair histórico de commits e autores usando PyDriller.',
-    ARRAY['script','mineração'], 8),
-
--- bioinfo (usuarios 5, 3, 7, 8)
-('bioinfo', 7, 3, 'Documentar ambiente conda do grupo',
-    'Padronizar o environment.yml para reprodutibilidade das análises.',
-    ARRAY['documentação','infra'], 9),
-('bioinfo', 5, 8, 'Alinhar sequências do lote 03',
-    'Rodar o alinhamento contra o genoma de referência e checar taxa de mapeamento.',
-    ARRAY['alinhamento','sequenciamento'], 10),
-('bioinfo', 5, 7, 'Validar pipeline de anotação de variantes',
-    'Comparar resultados do pipeline com um conjunto de variantes já curadas.',
-    ARRAY['validação','variantes'], 11),
-('bioinfo', 5, 7, 'Gerar figuras de redes de interação proteica',
-    'Produzir figuras em alta resolução para o manuscrito.',
-    ARRAY['figuras','redes'], 12),
-
--- edu-digital (usuarios 9, 7, 6, 8, 10)
-('edu-digital', 7, 8, 'Transcrever entrevistas com professores',
-    'Transcrever e anonimizar as 12 entrevistas realizadas em setembro.',
-    ARRAY['entrevistas','análise qualitativa'], 13),
-('edu-digital', 9, 10, 'Prototipar mecânica de gamificação',
-    'Criar protótipo navegável com pontos, medalhas e ranking.',
-    ARRAY['protótipo','gamificação'], 14),
-('edu-digital', 9, 7, 'Aplicar questionário piloto com alunos',
-    'Aplicar em uma turma e coletar feedback sobre clareza das questões.',
-    ARRAY['pesquisa','piloto'], 15),
-('edu-digital', 9, 6, 'Preparar apresentação para o simpósio de educação',
-    'Montar slides e ensaiar a apresentação de 15 minutos.',
-    ARRAY['evento','apresentação'], 16);
-
--- ---------------------------------------------------------------------
--- 6. posts
--- ---------------------------------------------------------------------
-INSERT INTO posts (group_id, publisher_user_id, title, description, content, tags, file_path, created_at) VALUES
-('ia-saude', 2,
-    'Resultados preliminares do baseline U-Net',
-    'Primeiros números do modelo de referência na segmentação de radiografias.',
-    E'# Resultados preliminares\n\nTreinamos o baseline U-Net por 50 épocas.\n\n- Dice médio: 0.81\n- IoU médio: 0.69\n\nPróximos passos: testar data augmentation e comparar com Attention U-Net.',
-    ARRAY['resultados','segmentação'],
-    '/uploads/ia-saude/resultados-unet-v1.pdf',
-    '2026-09-12 14:30:00'),
-
-('ia-saude', 1,
-    'Chamada de bolsas de iniciação científica 2027',
-    'Abertas as inscrições para bolsistas no grupo.',
-    E'# Bolsas de IC 2027\n\nO grupo tem **2 vagas** para iniciação científica.\n\nInteressados devem enviar histórico e carta de motivação à liderança até o fim do mês.',
-    ARRAY['aviso','bolsas'],
-    NULL,
-    '2026-10-02 09:15:00'),
-
-('eng-software', 2,
-    'Slides da reunião de planejamento do semestre',
-    'Apresentação com metas, prazos e divisão de tarefas.',
-    E'# Planejamento 2026.2\n\nAs metas do semestre estão nos slides em anexo. Revisem a divisão de tarefas no quadro Kanban até sexta.',
-    ARRAY['planejamento','reunião'],
-    '/uploads/eng-software/planejamento-2026-2.pptx',
-    '2026-08-20 10:00:00'),
-
-('eng-software', 6,
-    'Dataset de repositórios coletado',
-    'CSV com os 500 repositórios selecionados para o estudo.',
-    E'# Dataset coletado\n\nColunas: nome, linguagem, estrelas, número de contribuidores e data do último commit.\n\nCritério de inclusão: ao menos 100 commits nos últimos 12 meses.',
-    ARRAY['dados','github'],
-    '/uploads/eng-software/repos-dataset.csv',
-    '2026-09-25 16:45:00'),
-
-('bioinfo', 5,
-    'Guia rápido do pipeline de anotação',
-    'Passo a passo para rodar a anotação de variantes no servidor do grupo.',
-    E'# Guia rápido\n\n1. Ative o ambiente conda do grupo\n2. Coloque os arquivos VCF em `data/input`\n3. Execute `make annotate`\n4. Confira os resultados em `data/output`\n\nEm caso de erro, avisar no canal do grupo.',
-    ARRAY['tutorial','pipeline'],
-    NULL,
-    '2026-09-05 11:20:00'),
-
-('bioinfo', 8,
-    'Relatório de qualidade do lote 03',
-    'Resultado do controle de qualidade das sequências do último lote.',
-    E'# QC do lote 03\n\nTaxa média de mapeamento: **96,4%**. Duas amostras abaixo do limiar foram marcadas para ressequenciamento.',
-    ARRAY['qc','sequenciamento'],
-    '/uploads/bioinfo/qc-lote03.html',
-    '2026-10-10 15:05:00'),
-
-('edu-digital', 9,
-    'Protocolo do questionário piloto',
-    'Roteiro de aplicação e termo de consentimento do piloto com alunos.',
-    E'# Protocolo do piloto\n\nO questionário tem 20 questões e leva cerca de 15 minutos. Aplicar em sala, com autorização prévia da coordenação.',
-    ARRAY['pesquisa','protocolo'],
-    '/uploads/edu-digital/protocolo-piloto.pdf',
-    '2026-09-18 13:40:00'),
-
-('edu-digital', 10,
-    'Resumo aceito no simpósio de educação',
-    'Nosso trabalho sobre gamificação foi aceito para apresentação oral.',
-    E'# Resumo aceito\n\nA apresentação oral será em novembro. Precisamos ensaiar na semana anterior.',
-    ARRAY['evento','publicação'],
-    NULL,
-    '2026-10-15 08:30:00');
+-- Os embeddings não são fabricados pelo seed. Na primeira consulta às sugestões
+-- o processamento em segundo plano indexa estes registros com o mesmo modelo
+-- Cloudflare usado para usuários, grupos e posts criados normalmente.
 
 COMMIT;
-
--- ---------------------------------------------------------------------
--- Conferencia rapida (opcional)
--- ---------------------------------------------------------------------
--- SELECT g.name, COUNT(*) AS membros FROM user_research_group urg JOIN research_group g USING (group_id) GROUP BY g.name;
--- SELECT c.name AS coluna, COUNT(t.id) AS tarefas FROM kanban_columns c LEFT JOIN kanban_tasks t ON t.column_id = c.id GROUP BY c.id, c.name ORDER BY c.id;
