@@ -109,3 +109,33 @@ CREATE TABLE IF NOT EXISTS posts (
 CREATE INDEX IF NOT EXISTS idx_posts_group
     ON posts (group_id);
 
+-- =====================================================================
+-- 7. Ajustes de schema usados pelo seed de demonstracao (mock1.sql)
+--    O mock1.sql roda logo apos este arquivo, na criacao do banco e
+--    antes de o backend subir, entao precisa destas tabelas e colunas.
+--    Sao as mesmas definicoes de backend/src/main/resources/schema.sql,
+--    que continua aplicando tudo de forma idempotente a cada boot.
+-- =====================================================================
+
+CREATE EXTENSION IF NOT EXISTS vector;
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_level VARCHAR(30) NOT NULL DEFAULT 'NAO_VERIFICADO';
+
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS post_type VARCHAR(20);
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS keywords TEXT[];
+
+CREATE TABLE IF NOT EXISTS researcher_follows (
+    follower_id BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    followed_id BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    interest_areas TEXT[],
+    interest_embedding vector(1024),
+    PRIMARY KEY (follower_id, followed_id),
+    CONSTRAINT ck_no_self_follow CHECK (follower_id <> followed_id)
+);
+
+CREATE TABLE IF NOT EXISTS group_follows (
+    follower_id BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    group_id VARCHAR(255) NOT NULL REFERENCES research_group (group_id) ON DELETE CASCADE,
+    PRIMARY KEY (follower_id, group_id)
+);
+
