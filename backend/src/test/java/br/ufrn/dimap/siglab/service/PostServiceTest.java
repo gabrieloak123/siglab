@@ -9,8 +9,10 @@ import br.ufrn.dimap.siglab.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import java.util.List;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
@@ -25,8 +27,9 @@ class PostServiceTest {
     @Mock User_ResearchGroupRepository memberships;
     @Mock IndexingQueue indexing;
     @Mock PostLikeRepository likes;
+    @Mock ApplicationEventPublisher events;
     PostService service;
-    @BeforeEach void setup() { service=new PostService(posts,groups,users,memberships,indexing,likes); }
+    @BeforeEach void setup() { service=new PostService(posts,groups,users,memberships,indexing,likes,events); }
 
     private void leader() {
         when(groups.existsById("lab")).thenReturn(true);
@@ -49,6 +52,20 @@ class PostServiceTest {
         Post saved=service.criar("lab","leader@lab.org",request);
         assertEquals(0,saved.getKeywords().length);
         verify(indexing).enqueue("POST", "9");
+    }
+    @Test void publishingAnnouncesTheFollowers() {
+        leader();
+        CreatePostRequestDTO request=new CreatePostRequestDTO();
+        request.setPostType("OUTROS"); request.setContent("Corpo"); request.setTitle("Título");
+        when(posts.save(any(Post.class))).thenAnswer(invocation -> { Post post=invocation.getArgument(0); post.setId(9L); return post; });
+        service.criar("lab","leader@lab.org",request);
+        ArgumentCaptor<Object> event=ArgumentCaptor.forClass(Object.class);
+        verify(events).publishEvent(event.capture());
+        PostPublishedEvent published=(PostPublishedEvent) event.getValue();
+        assertEquals("lab", published.groupId());
+        assertEquals(9L, published.postId());
+        assertEquals(4L, published.publisherUserId());
+        assertEquals("Título", published.title());
     }
     @Test void anonymousVisitorCanListGroupPosts() {
         when(groups.existsById("lab")).thenReturn(true);
