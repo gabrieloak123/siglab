@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { DashboardWordCloud } from "@/components/groups/DashboardWordCloud";
 import { GroupAreaHeader } from "@/components/groups/GroupAreaHeader";
 import { GroupNavigation } from "@/components/groups/GroupNavigation";
+import { PostsByTypeChart } from "@/components/groups/PostsByTypeChart";
 import { useGroupArea } from "@/hooks/useGroupArea";
 import { groupsApi, messageOf, ApiError } from "@/lib/api";
 import type { GroupDashboard } from "@/types";
@@ -88,6 +90,10 @@ function DashboardMetrics({ groupId }: { groupId: string }) {
           <h3 className="font-semibold">{metric.label}</h3>
           {metric.type === "total" ? (
             <p className="mt-2 text-3xl font-bold tabular-nums">{metric.value}</p>
+          ) : metric.id === "posts-by-type" ? (
+            <PostsByTypeChart items={metric.items} />
+          ) : metric.id === "post-tags-cloud" || metric.id === "member-interests-cloud" ? (
+            <DashboardWordCloud items={metric.items} />
           ) : metric.items.length ? (
             <ul className="mt-3 divide-y divide-gray-200">
               {metric.items.map((item) => (

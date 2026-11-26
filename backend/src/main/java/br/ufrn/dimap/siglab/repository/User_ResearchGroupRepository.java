@@ -1,5 +1,6 @@
 package br.ufrn.dimap.siglab.repository;
 
+import br.ufrn.dimap.siglab.model.User;
 import br.ufrn.dimap.siglab.model.User_ResearchGroup;
 import br.ufrn.dimap.siglab.model.User_ResearchGroupId;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,6 +12,9 @@ import java.util.List;
 
 @Repository
 public interface User_ResearchGroupRepository extends JpaRepository<User_ResearchGroup, User_ResearchGroupId> {
+
+    @Query("SELECT membership.user FROM User_ResearchGroup membership WHERE membership.researchGroup.group_id = :groupId")
+    List<User> findUsersByGroupId(@Param("groupId") String groupId);
 
     @Query("SELECT urg FROM User_ResearchGroup urg WHERE urg.researchGroup.group_id = :groupId")
     List<User_ResearchGroup> findByGroupId(@Param("groupId") String groupId);
