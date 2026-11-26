@@ -2,7 +2,7 @@ import Link from "next/link";
 
 interface GroupNavigationProps {
   groupId: string;
-  active: "board" | "posts" | "settings";
+  active: "dashboard" | "board" | "posts" | "settings";
   isLeader: boolean;
 }
 
@@ -13,7 +13,8 @@ export function GroupNavigation({ groupId, active, isLeader }: GroupNavigationPr
 
   return (
     <nav aria-label="Navegação da área do grupo" className="flex flex-wrap gap-1 mb-6 rounded border border-gray-300 bg-white p-1">
-      <Link href={basePath} className={itemClass("board")} aria-current={active === "board" ? "page" : undefined}>Quadro</Link>
+      <Link href={basePath} className={itemClass("dashboard")} aria-current={active === "dashboard" ? "page" : undefined}>Visão geral</Link>
+      <Link href={`${basePath}/board`} className={itemClass("board")} aria-current={active === "board" ? "page" : undefined}>Quadro</Link>
       <Link href={`${basePath}/posts`} className={itemClass("posts")} aria-current={active === "posts" ? "page" : undefined}>Posts</Link>
       {isLeader && <Link href={`${basePath}/settings`} className={itemClass("settings")} aria-current={active === "settings" ? "page" : undefined}>Configurações</Link>}
     </nav>

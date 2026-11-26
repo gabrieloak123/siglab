@@ -9,3 +9,12 @@ export interface KanbanBoard { id: string; id_grupo_pesquisa: string; colunas: K
 export interface Post { id: number; groupId: string; publisherUserId?: number | null; title: string; description?: string | null; content?: string | null; tags?: string[] | null; filePath?: string | null; createdAt?: string | null; postType?: "ARTIGO" | "OUTROS"; keywords?: string[] }
 export interface ConferenceSuggestion { id: number; shortName?: string | null; fullName?: string | null; conferenceDate?: string | null; submissionDate?: string | null; location?: string | null; ccfRank?: string | null; cpIndexScore?: number | null; detailPage?: string | null }
 export type AuthTab = "login" | "register";
+
+type GroupDashboardMetric = { id: string; label: string } & (
+  | { type: "total"; value: number }
+  | { type: "breakdown"; items: { id: string; label: string; value: number }[] }
+);
+
+export interface GroupDashboard {
+  metrics: GroupDashboardMetric[];
+}

@@ -1,5 +1,5 @@
 import { isSameEmail } from "@/lib/utils";
-import type { ConferenceSuggestion, GooglePreview, GroupMember, KanbanBoard, KanbanTask, Post, ResearchGroup, User } from "@/types";
+import type { ConferenceSuggestion, GooglePreview, GroupDashboard, GroupMember, KanbanBoard, KanbanTask, Post, ResearchGroup, User } from "@/types";
 
 const DEFAULT_API_URL = "/backend-api";
 export const getApiUrl = () => DEFAULT_API_URL;
@@ -73,6 +73,7 @@ export const discoveryApi = {
 export type InviteTokenResponse = { inviteToken: string };
 const groupPath = (id: string) => `/api/research-groups/${encodeURIComponent(id)}`;
 export const groupsApi = {
+  dashboard: (id: string, signal: AbortSignal) => request<GroupDashboard>(`${groupPath(id)}/dashboard`, { signal }),
   list: () => request<ResearchGroup[]>("/api/research-groups"),
   get: (id: string) => request<ResearchGroup>(groupPath(id)),
   create: (payload: ResearchGroup) => request<ResearchGroup>("/api/research-groups", { method: "POST", ...jsonBody(payload) }),
